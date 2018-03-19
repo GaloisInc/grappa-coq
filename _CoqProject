@@ -1,3 +1,4 @@
 -Q theories GrappaCoq
 
+./theories/Set.v
 ./theories/Topology.v
