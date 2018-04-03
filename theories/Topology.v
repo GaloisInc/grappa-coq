@@ -17,8 +17,7 @@ Section topology.
   Class Opens : Type :=
     open : set (set X).
 
-  (* The collection of open sets are subsets of the domain and satisfy
-     the topology axioms. *)
+  (* The collection of open sets satisfies the topology axioms. *)
   Class Topology (opens : Opens)
     : Type :=
     { emptyAxiom : open (@empty X);
@@ -62,6 +61,10 @@ Section topology.
 
   Definition neighborhood {O : Opens} (A : set X) (x : X) :=
     open A /\ A x.
+
+  Lemma exists_neighborhood {O : Opens} {T : Topology O} (x : X) :
+    exists U, neighborhood U x.
+  Proof. firstorder. Qed.
 End topology.
 
 Section basis.
@@ -397,7 +400,7 @@ End subbasis.
 Section closed.
   Variable X : Type.
   Notation D := (@full X).
-  Context (O : Opens X) {T : Topology O}.
+  Context {O : Opens X} {T : Topology O}.
 
   Definition closed (A : set X) :=
     open (complement A).
@@ -607,8 +610,8 @@ Section binaryProductBasisTopology.
     - admit.
   Admitted.
 
-  (* The product topology formed with products of basis elements is
-     finer than the one formed with products of open sets. *)
+  (* The product topology formed from products of basis elements is
+     finer than the one formed from products of open sets. *)
   Lemma binary_products_finer :
     finer binaryProductBasisOpens
           (binaryProductOpens (generate bsetX) (generate bsetY)).
@@ -652,15 +655,25 @@ Section theorem_17_5.
   Variable A : set X.
 
   Lemma theorem_17_5_1 :
-    forall x, closure O A x <-> forall U, neighborhood U x -> intersects U A.
+    forall x, closure A x <-> forall U, neighborhood U x -> intersects U A.
   Admitted.
+
+  (* A simple consequence of the above theorem. *)
+  Lemma corollary_17_5_1 (U : set X) (x : X) :
+    closure A x ->
+    neighborhood U x ->
+    exists y, intersects_at A U y.
+  Proof.
+    intros H0 [? ?]; rewrite theorem_17_5_1 in H0;
+      specialize (H0 U); firstorder.
+  Qed.
 
   Section theorem_17_5_2.
     Context (bset : BasisSet X) (B : Basis bset).
     Variable gen_pf : generates B O.
 
     Lemma theorem_17_5_2 :
-      forall x, closure O A x <-> forall b, bset b -> b x -> intersects b A.
+      forall x, closure A x <-> forall b, bset b -> b x -> intersects b A.
     Admitted.
   End theorem_17_5_2.
 End theorem_17_5.
@@ -675,7 +688,7 @@ Section limitPoint.
     forall U, neighborhood U x -> exists y, y <> x /\ A y /\ U y.
 
   Definition limit_point' (x : X) (A : set X) :=
-    closure O (subtract A (singleton x)) x.
+    closure (subtract A (singleton x)) x.
 
   Lemma limit_point_equiv (x : X) (A : set X) :
     limit_point x A <-> limit_point' x A.
@@ -685,14 +698,14 @@ Section limitPoint.
     fun x => limit_point x A.
 
   Lemma jkdfgfd (A : set X) (x : X) :
-    closure O A x -> A x \/ limit_points A x.
+    closure A x -> A x \/ limit_points A x.
   Admitted.
 
   (** Theorem 17.6: Let A be a subset of the topological space D. Then
     the closure of A is equal to the union of A with the set of all
     limit points of A. *)
   Lemma theorem_17_6 (A : set X) :
-    closure O A = union A (limit_points A).
+    closure A = union A (limit_points A).
   Proof.
     apply extensionality; split.
     - intros x H1. unfold closure in H1.
@@ -706,7 +719,7 @@ Section limitPoint.
   Qed.
 
   Lemma jkdfg (A : set X) :
-    A = closure O A <-> subset (limit_points A) A.
+    A = closure A <-> subset (limit_points A) A.
   Proof.
     split; intro H0.
     - rewrite H0. 
@@ -719,12 +732,13 @@ Section limitPoint.
   (** Corollary 17.7: A subset of a topological space is closed if and
     only if it contains all its limit points. *)
   Lemma corollary_17_7 (A : set X) :
-    closed O A <-> subset (limit_points A) A.
+    closed A <-> subset (limit_points A) A.
   Proof.
     split; intro H0.
     - intros x Hx. apply closed_equals_closure in H0; auto.
   Admitted.
 End limitPoint.
+
 
 Section hausdorff.
   Variable X : Type.
@@ -738,12 +752,13 @@ Section hausdorff.
       exists U1 U2, O U1 /\ O U2 /\ U1 x1 /\ U2 x2 /\ disjoint U1 U2.  
 End hausdorff.
 
+
 Section continuous.
   Variable X Y : Type.
   Notation D1 := (@full X).
   Notation D2 := (@full Y).
-  Context (O1 : Opens X) (T1 : Topology O1).
-  Context (O2 : Opens Y) (T2 : Topology O2).
+  Context {O1 : Opens X} {T1 : Topology O1}.
+  Context {O2 : Opens Y} {T2 : Topology O2}.
   Variable f : X -> Y.
 
   Definition continuous := forall V, O2 V -> O1 (preimage f V).
@@ -757,31 +772,32 @@ Section continuous.
 
   Definition continuous_b :=
     forall A : set X,
-      subset (image f (complement A)) (complement (image f A)).
+      subset (image f (closure A)) (closure (image f A)).
 
   Definition continuous_c :=
-    forall B : set Y, closed O2 B -> closed O1 (preimage f B).
+    forall B : set Y, closed B -> closed (preimage f B).
 
   Definition continuous_at (x : X) :=
     forall (V : set Y),
       neighborhood V (f x) ->
       exists (U : set X), neighborhood U x /\ subset (image f U) V.
 
-  (* Definition continuous_d := *)
-  (*   forall (x : X) (V : set Y), *)
-  (*     neighborhood V (f x) -> *)
-  (*     exists (U : set X), neighborhood U x /\ subset (image f U) V. *)
-
-  (* Definition continuous_at x := (@continuous_d x). *)
-
   Lemma theorem_18_1_1 :
     continuous -> continuous_b.
   Proof.
-  Admitted.
+    intros H0 A y Hy.
+    destruct Hy as [x [H1 H2]]; subst.
+    apply theorem_17_5_1; auto.
+    intros V [H2 H3]; specialize (H0 V H2).
+    rewrite theorem_17_5_1 in H1; auto.
+    specialize (H1 (preimage f V)); firstorder.
+  Qed.
 
   Lemma theorem_18_1_2 :
     continuous_b -> continuous_c.
   Proof.
+    intros H0 B H1. 
+    set (A := preimage f B).
   Admitted.
 
   Lemma theorem_18_1_3 :
@@ -806,7 +822,7 @@ Section homeo.
   Variable f' : Y -> X.
   Variable pf : inverse f f'.
 
-  Definition homeomorphism := continuous O1 O2 f /\ continuous O2 O1 f'.
+  Definition homeomorphism := continuous f /\ continuous f'.
 End homeo.
 
 
@@ -856,7 +872,7 @@ Section constructingContinuous.
   (* Not constructive *)
   Lemma constant_continuous (f : X -> Y) (y : Y) :
     constant f y ->
-    continuous O1 O2 f.
+    continuous f.
   Proof.
     intros Hc V H0. unfold constant in Hc.
     (* Is this necessary? y is either in V or not. *)
@@ -877,7 +893,7 @@ Section compositionContinuous.
   Context (O3 : Opens Z) (T3 : Topology O3).
 
   Lemma composition_continuous (f : X -> Y) (g : Y -> Z) :
-    continuous O1 O3 (compose g f).
+    continuous (compose g f).
   Proof.
   Admitted.
 End compositionContinuous.
@@ -900,7 +916,7 @@ Section mapsIntoBinaryProducts.
   Definition h := fun a => (f a, g a).
 
   Lemma binary_product_map_continuous :
-    continuous OA OP h <-> continuous OA OX f /\ continuous OA OY g.
+    @continuous _ _ _ OP h <-> continuous f /\ continuous g.
   Proof.
     split.
     - intro H0; split.

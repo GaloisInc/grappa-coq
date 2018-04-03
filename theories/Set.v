@@ -41,6 +41,9 @@ Section set.
   Definition intersects (A B : set) :=
     not_empty (intersection A B).
 
+  Definition intersects_at (A B : set) (x : T) :=
+    A x /\ B x.
+
   Definition finite_intersection (l : list set) :=
     fold_right (fun x acc => intersection x acc) full l.
 
@@ -305,12 +308,9 @@ Section setLemmas.
     A = union B C.
   Proof.
     intros Hsubset Hsubtract.
-    apply extensionality. split.
-    - intros x Hx.
-      unfold union.
-      unfold subtract in Hsubtract.
-      rewrite <- Hsubtract.
-      destruct (classic (B x)); firstorder.
+    apply extensionality; split.
+    - intros x Hx; unfold union; unfold subtract in Hsubtract.
+      rewrite <- Hsubtract; destruct (classic (B x)); firstorder.
     - intros x [? | H]; firstorder.
       rewrite <- Hsubtract in H; firstorder.
   Qed.
@@ -319,7 +319,7 @@ Section setLemmas.
   Lemma subtract_intersection (A B : set T) :
     subtract A (subtract A B) = intersection A B.
   Proof.
-    apply extensionality. split.
+    apply extensionality; split.
     - intros ? ?; firstorder.
       destruct (classic (B x)); auto; contradiction.
     - firstorder.
