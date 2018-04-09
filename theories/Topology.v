@@ -6,6 +6,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Require Import List. Import ListNotations.
 Require Import Coq.Logic.Classical_Prop.
+Require Import Coq.Logic.Classical_Pred_Type.
 
 Require Import GrappaCoq.Set.
 
@@ -22,13 +23,13 @@ Section topology.
     : Type :=
     { emptyAxiom : open (@empty X);
       fullAxiom  : open (@full X);
-      unionAxiom : forall (C : P X),
+      unionAxiom : forall (C : pow X),
           (forall A : set X, C A -> open A) ->
           open (big_union C);
       intersectionAxiom : forall A B : set X,
           open A -> open B -> open (intersection A B) }.
 
-  Definition all_open (O : Opens) (C : P X) := forall A, C A -> O A.
+  Definition all_open (O : Opens) (C : pow X) := forall A, C A -> O A.
 
   Definition finer (A B : Opens) := subset B A.
   Definition larger (A B : Opens) := finer A B.
@@ -67,16 +68,17 @@ Section topology.
   Proof. firstorder. Qed.
 End topology.
 
+
 Section basis.
   Variable X : Type.
 
   (** Basis of a topology *)
 
   Class BasisSet : Type :=
-    basis : P X.
+    basis : pow X.
 
-  Definition basisAxiom1 (C : P X) := forall x : X, exists b, C b /\ b x.
-  Definition basisAxiom2 (C : P X) := forall x b1 b2,
+  Definition basisAxiom1 (C : pow X) := forall x : X, exists b, C b /\ b x.
+  Definition basisAxiom2 (C : pow X) := forall x b1 b2,
       C b1 -> C b2 -> (intersection b1 b2) x ->
       exists b3, C b3 /\ b3 x /\ subset b3 (intersection b1 b2).
 
@@ -85,7 +87,7 @@ Section basis.
     { basisAx1 : basisAxiom1 BSet;
       basisAx2 : basisAxiom2 BSet }.
 
-  Definition generate (B : P X) := fun A => exists C, subset C B /\ big_union C = A.
+  Definition generate (B : pow X) := fun A => exists C, subset C B /\ big_union C = A.
 
   (* Basis B generates the open sets O. *)
   Definition generates `(B : Basis) (O : Opens X) :=
@@ -131,7 +133,7 @@ Section basis.
 
   Lemma basis_topology_union_axiom `(B : Basis) (O : Opens X) :
     generates B O ->
-    forall (C : P X),
+    forall (C : pow X),
       (forall A : set X, C A -> O A) ->
       O (big_union C).
   Proof.
@@ -201,7 +203,7 @@ Section basis.
     - destruct H1 as [b [[H1 H2] H3]]; apply H2; assumption.
   Qed.
 
-  Lemma all_open_subset_basis `(B : Basis) (O : Opens X) (C : P X) :
+  Lemma all_open_subset_basis `(B : Basis) (O : Opens X) (C : pow X) :
     generates B O ->
     all_open _ C ->
     exists D, subset D basis /\ big_union D = big_union C.
@@ -245,12 +247,13 @@ Section basis.
       rewrite Hunion; eapply subset_basis_union_open; eauto.
   Qed.
 
+
   (** Lemma 13.2 : Let X be a topological space. Suppose that C is a
       collection of open sets of X such that for each open set U of X
       and each x in U, there is an element b of C such that x \in b
       and b \subset U. Then, C is a basis for the topology of X.  *)
   Section lemma_13_2.
-    Context `(T : Topology X) (C : P X).
+    Context `(T : Topology X) (C : pow X).
     Variable H0 : all_open opens C.
     Variable H1: forall U, open U ->
                       forall x, U x ->
@@ -312,6 +315,7 @@ Section basis.
     Qed.
   End lemma_13_2.
 
+
   (** Lemma 13.3: Let B and B' be bases for the topologies O and O',
       respectively, on X. Then the following are equivalent:
       1) O' is finer than O
@@ -319,7 +323,7 @@ Section basis.
          there is a basis element b' \in B' such that x \in B' and B'
          \subset B.  *)
   Section lemma_13_3.
-    Variable basis basis' : P X.
+    Variable basis basis' : pow X.
     Context (B : @Basis basis) (B' : @Basis basis').
     Context (O : Opens X) (O' : Opens X).
     Variable Hgen : generates B O.
@@ -352,9 +356,9 @@ Section subbasis.
       whose union equals D. *)
 
   Class SubbasisSet : Type :=
-    subbasis : P X.
+    subbasis : pow X.
 
-  Definition subbasisAxiom (C : P X) := big_union C = D.
+  Definition subbasisAxiom (C : pow X) := big_union C = D.
 
   Class Subbasis (SBSet : SubbasisSet)
     : Type :=
@@ -363,7 +367,7 @@ Section subbasis.
   (* A subbasis gives rise to a basis by letting the basis elements be
      finite intersections of subbasis elements. *)
 
-  Definition subbasis_basis (B : P X) :=
+  Definition subbasis_basis (B : pow X) :=
     fun A => exists l, List.Forall B l /\ A = finite_intersection l.
 
   Program Instance subbasisBasis `(SB : Subbasis)
@@ -405,7 +409,7 @@ Section closed.
   Definition closed (A : set X) :=
     open (complement A).
 
-  Definition all_closed (C : P X) := forall A, C A -> closed A.
+  Definition all_closed (C : pow X) := forall A, C A -> closed A.
 
   Definition closure (A : set X) :=
     big_intersection (fun B => closed B /\ subset A B).
@@ -426,7 +430,7 @@ Section closed.
     unfold closed; rewrite complement_domain_equals_empty; firstorder.
   Qed.
 
-  Lemma arbitrary_intersections_closed (C : P X) :
+  Lemma arbitrary_intersections_closed (C : pow X) :
     all_closed C -> closed (big_intersection C).
   Proof.
     intro Hclosed; unfold closed.
@@ -465,44 +469,18 @@ Section closed.
     - apply extensionality; firstorder.
     - rewrite H0; apply closure_closed.
   Qed.
+
+  Lemma complement_closure_open (A : set X) :
+    O (complement (closure A)).
+  Proof.
+  Admitted.
+
+  Lemma subset_closure (A U : set X) :
+    closed U ->
+    subset A U ->
+    subset (closure A) U.
+  Proof. firstorder. Qed.
 End closed.
-
-
-(*****************)
-(** Begin Grappa *)
-
-Section Lemma1.
-  Variable X : Type.
-  Notation D := (@full X).
-  Variable B : P X.
-  Variable pf1 : forall b1 b2, B b1 -> B b2 -> B (intersection b1 b2).
-  Variable pf2 : big_union B = D.
-
-  Instance basisInstance : Basis B.
-  Proof.
-    constructor.
-    - intros x; assert (D x) by firstorder.
-      rewrite <- pf2 in H; firstorder.
-    - firstorder.
-  Qed.
-
-  Lemma exists_topology : exists T, generates basisInstance T.
-  Proof. exists (generate B); apply generate_generates. Qed.
-
-  Lemma topology_unique : forall T1 T2,
-      generates basisInstance T1 ->
-      generates basisInstance T2 ->
-      T1 = T2.
-  Proof.
-    intros T1 T2 Hgen1 Hgen2; apply extensionality; firstorder.
-  Qed.
-End Lemma1.
-
-
-(* Section orderTopology. *)
-(*   Variable X : Type. *)
-(*   Variable D : set X. *)  
-(* End orderTopology. *)
 
 
 (* Given two topologies, form the basis for a binary product topology
@@ -624,7 +602,7 @@ Section binaryProductBasisTopology.
     - apply extensionality; split.
       + firstorder.
       + intros [x y] [Z [H1 H2]].
-        assert (H3: exists C0 : P (X*Y), subset C0 binaryProductBasisSet' /\
+        assert (H3: exists C0 : pow (X*Y), subset C0 binaryProductBasisSet' /\
                                     Z = big_union C0).
         { eapply l_13_2_1. apply binaryProductBasisTopology.
           firstorder; subst; firstorder.
@@ -656,7 +634,30 @@ Section theorem_17_5.
 
   Lemma theorem_17_5_1 :
     forall x, closure A x <-> forall U, neighborhood U x -> intersects U A.
-  Admitted.
+  Proof.
+    intro x. split.
+    - apply (@contrapositive
+               (closure A x)
+               (forall U : set X, neighborhood U x -> intersects (T:=X) U A)).
+      intro H0.
+      apply not_all_ex_not in H0; destruct H0 as [U H0].
+      apply imply_to_and in H0; destruct H0 as [H0 ?].
+      assert (closed (complement U)).
+      { unfold closed; rewrite complement_cancel; firstorder. }
+      assert (subset A (complement U)) by firstorder.
+      assert (subset (closure A) (complement U)).
+      { apply subset_closure; auto. }
+      firstorder.
+    - apply contrapositive; intro H0.
+      assert (H1: exists U, neighborhood U x /\ ~ intersects U A).
+      { exists (complement (closure A)). split.
+        - split. 
+          + apply complement_closure_open; auto.
+          + firstorder.
+        - firstorder. }
+      intro HC; destruct H1 as [U [H1 H2]].
+      specialize (HC U H1); congruence.
+  Qed.
 
   (* A simple consequence of the above theorem. *)
   Lemma corollary_17_5_1 (U : set X) (x : X) :
@@ -668,6 +669,7 @@ Section theorem_17_5.
       specialize (H0 U); firstorder.
   Qed.
 
+
   Section theorem_17_5_2.
     Context (bset : BasisSet X) (B : Basis bset).
     Variable gen_pf : generates B O.
@@ -677,6 +679,7 @@ Section theorem_17_5.
     Admitted.
   End theorem_17_5_2.
 End theorem_17_5.
+
 
 Section limitPoint.
   Variable X : Type.
@@ -968,7 +971,7 @@ Section productTopology.
   Variable O : J_tuple (fun j => Opens (X j)).
   Variable T : J_tuple (fun j => Topology (@O j)).
 
-  Definition S_beta (j : J) : P (J_tuple X) :=
+  Definition S_beta (j : J) : pow (J_tuple X) :=
     fun s => exists U, O U /\ s = preimage (proj j) U.
 
   (* The above definition with explicit type annotations *)
@@ -1002,3 +1005,37 @@ Section productTopology.
                          (generate_generates _)).
   Qed.
 End productTopology.
+
+
+(*****************)
+(** Begin Grappa *)
+
+Section lemma1.
+  Variable X : Type.
+  Notation D := (@full X).
+  Context {O : Opens X} {T : Topology O}.
+  Variable B : pow X.
+  Variable pf : forall U, O U -> exists C, subset C B /\ big_union C = U.
+
+  Instance basisInstance : Basis B.
+  Proof.
+    constructor.
+    - intros x; assert (H0: D x) by firstorder.
+      assert (H1: O D) by firstorder.
+      specialize (pf H1); destruct pf as [C [H2 H3]].
+      rewrite <- H3 in H0; firstorder.
+    - admit.
+      (* Not sure about this. *)
+  Admitted.
+
+  Lemma exists_topology : exists T, generates basisInstance T.
+  Proof. exists (generate B); apply generate_generates. Qed.
+
+  Lemma topology_unique : forall T1 T2,
+      generates basisInstance T1 ->
+      generates basisInstance T2 ->
+      T1 = T2.
+  Proof.
+    intros T1 T2 Hgen1 Hgen2; apply extensionality; firstorder.
+  Qed.
+End lemma1.

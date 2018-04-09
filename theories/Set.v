@@ -5,6 +5,12 @@ Require Import Coq.Logic.Classical_Prop.
 Require Import Coq.Logic.Classical_Pred_Type.
 
 
+(* Implied by the law of excluded middle *)
+Lemma contrapositive (P Q : Prop) :
+  (P -> Q) <-> (~Q -> ~P).
+Proof. firstorder; destruct (classic Q); firstorder. Qed.
+
+
 Section set.
   Variable T : Type.
 
@@ -16,6 +22,9 @@ Section set.
 
   Definition singleton (x : T) :=
     fun y => x = y.
+
+  Definition doubleton (x y : T) :=
+    fun z => z = x \/ z = y.
 
   Definition empty := fun _ : T => False.
   Definition full := fun _ : T => True.
@@ -51,7 +60,8 @@ Section set.
 End set.
 
 
-Notation "'P' x" := (set (set x)) (at level 65).
+Notation "'pow' x" := (set (set x)) (at level 65).
+
 
 Section power_set.
   Variable T : Type.
@@ -72,20 +82,20 @@ Section product.
   Definition pi2_set (A : set (X*Y)) : set Y :=
     fun y => exists p, A p /\ snd p = y.
 
-  Definition pi1_collection (A : P (X*Y)) : P X :=
+  Definition pi1_collection (A : pow (X*Y)) : pow X :=
     fun B => exists p, A p /\ pi1_set p = B.
 
-  Definition pi2_collection (A : P (X*Y)) : P Y :=
+  Definition pi2_collection (A : pow (X*Y)) : pow Y :=
     fun B => exists p, A p /\ pi2_set p = B.
 End product.
 
 
 Section arbitrary.
   Variable T : Type.
-  Definition big_union (C : P T) :=
+  Definition big_union (C : pow T) :=
     fun x => exists A, C A /\ A x.
 
-  Definition big_intersection (C : P T) :=
+  Definition big_intersection (C : pow T) :=
     fun x => forall A, C A -> A x.
 
   (* (* Wrt a domain D instead of the entire space of T. *) *)
@@ -93,10 +103,10 @@ Section arbitrary.
   (*   (* fun x => forall A, C A -> A x /\ D x. *) *)
   (*   intersection (big_intersection C) D. *)
 
-  Definition all_unions (A : P T) :=
+  Definition all_unions (A : pow T) :=
     fun B => exists C, subset C A /\ B = (big_union C).
 
-  Definition big_subtract (A : set T) (C : P T) :=
+  Definition big_subtract (A : set T) (C : pow T) :=
     fun B => exists c, C c /\ B = subtract A c.
 
   Definition binary_collection (A B : set T) :=
@@ -139,7 +149,7 @@ Section tuple.
     fun x => forall j, A j x.
 
   Definition family_collection (X : Type) (A : family (fun _ => X))
-    : P X :=
+    : pow X :=
     fun B => exists j, A j = B.
 
   Definition proj (X : J -> Type) (j : J) (A : J_tuple X)
@@ -181,6 +191,7 @@ Section compose.
     fun x => g (f x).
 End compose.
 
+
 Section setLemmas.
   Variable T : Type.
 
@@ -206,7 +217,7 @@ Section setLemmas.
     intros ?; apply extensionality; split; intros ? ?; firstorder.
   Qed.
 
-  Lemma subset_big_union (A : set T) (C : P T) :
+  Lemma subset_big_union (A : set T) (C : pow T) :
     C A -> subset A (big_union C).
   Proof. firstorder. Qed.
 
@@ -220,12 +231,12 @@ Section setLemmas.
     subset A B -> subset B C -> subset A C.
   Proof. firstorder. Qed.
 
-  Lemma subset_big_union2 (C C' : P T) :
+  Lemma subset_big_union2 (C C' : pow T) :
     subset C C' ->
     subset (big_union C) (big_union C').
   Proof. firstorder. Qed.
 
-  Lemma big_union_all_unions (C : P T) :
+  Lemma big_union_all_unions (C : pow T) :
     big_union (all_unions C) = big_union C.
   Proof.
     apply extensionality. split; intros x Hx.
@@ -258,7 +269,7 @@ Section setLemmas.
   Proof. apply extensionality; firstorder. Qed.
 
   (* Not constructive. *)
-  Lemma demorgan_1_big (A : set T) (C : P T) :
+  Lemma demorgan_1_big (A : set T) (C : pow T) :
     subtract A (big_intersection C) = big_union (big_subtract A C).
   Proof.
     apply extensionality. split.
@@ -289,11 +300,11 @@ Section setLemmas.
     - firstorder.
   Qed.
 
-  Lemma collection_subset_intersection (C : P T) (A : set T) :
+  Lemma collection_subset_intersection (C : pow T) (A : set T) :
     exists B, C B /\ subset B A -> subset (big_intersection C) A.
   Proof. firstorder. Qed.
 
-  Lemma collection_subset_union (C : P T) (A : set T) :
+  Lemma collection_subset_union (C : pow T) (A : set T) :
     (forall B, C B -> subset B A) -> subset (big_union C) A.
   Proof. firstorder. Qed.
 
@@ -380,6 +391,15 @@ Section setLemmas.
     rewrite !complement_subtract_full; apply demorgan_1.
   Qed.
 
+  (* Non constructive *)
+  Lemma complement_cancel (A : set T) :
+    complement (complement A) = A.
+  Proof.
+    apply extensionality; split.
+    - intros x Hx; apply NNPP; assumption.
+    - firstorder.
+  Qed.
+
   Lemma is_empty_empty :
     is_empty (@empty T).
   Proof. firstorder. Qed.
@@ -444,6 +464,7 @@ Section productLemmas.
     is_empty (pi2_set A).
   Proof. firstorder. Qed.
 End productLemmas.
+
 
 Section functionLemmas.
   Variable X Y : Type.
