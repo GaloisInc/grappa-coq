@@ -42,13 +42,16 @@ Section set.
     fun x => A x /\ ~ B x.
 
   Definition not_empty (A : set) :=
+    A <> empty.
+
+  Definition nonempty (A : set) :=
     exists x, A x.
 
   Definition is_empty (A : set) :=
-    ~ not_empty A.
+    ~ nonempty A.
 
   Definition intersects (A B : set) :=
-    not_empty (intersection A B).
+    nonempty (intersection A B).
 
   Definition intersects_at (A B : set) (x : T) :=
     A x /\ B x.
@@ -56,11 +59,46 @@ Section set.
   Definition finite_intersection (l : list set) :=
     fold_right (fun x acc => intersection x acc) full l.
 
+  Definition in_set (x : T) (A : set) :=
+    A x.
+
+  Definition not_in_set (x : T) (A : set) :=
+    ~ A x.
+
   Axiom extensionality : forall A B : set, subset A B /\ subset B A -> A = B.
 End set.
 
 
-Notation "'pow' x" := (set (set x)) (at level 65).
+Notation "∅ x" := (@empty x) (at level 65) : set_scope.
+Notation "a '∪' b" := (union a b) (at level 65) : set_scope.
+Notation "a '∩' b" := (intersection a b) (at level 65) : set_scope.
+Notation "a '⊆' b" := (subset a b) (at level 65) : set_scope.
+Notation "'pow' x" := (set (set x)) (at level 65) : set_scope.
+Notation "x '∈' a" := (in_set x a) (at level 65) : set_scope.
+Notation "x '∉' a" := (not_in_set x a) (at level 65) : set_scope.
+Notation "a '∖' b":= (subtract a b) (at level 65) : set_scope.
+
+Open Scope set_scope.
+
+
+Section map.
+  Context {X Y : Type} (f : X -> Y).
+  Definition map (A : set X) : set Y :=
+    fun y => exists x, x ∈ A /\ f x = y.
+End map.
+
+
+Section mapLemmas.
+  Context {X Y : Type} (f : X -> Y).
+  Lemma map_empty (A : set X) :
+    is_empty A -> is_empty (map f A).
+  Proof. firstorder. Qed.
+
+  Lemma map_nonempty (A : set X) (y : Y) :
+    y ∈ map f A ->
+    nonempty A.
+  Proof. firstorder. Qed.
+End mapLemmas.
 
 
 Section power_set.
@@ -112,6 +150,9 @@ Section arbitrary.
   Definition binary_collection (A B : set T) :=
     fun X => X = A \/ X = B.
 End arbitrary.
+
+Notation "'⋃' c" := (big_union c) (at level 15) : set_scope.
+Notation "'⋂' c" := (big_intersection c) (at level 15) : set_scope.
 
 
 Section tuple.
@@ -427,7 +468,7 @@ Section productLemmas.
   Proof. apply extensionality. split; intros [? ?]; firstorder. Qed.
 
   Lemma pi1_product (A : set X) (B : set Y) :
-    not_empty B ->
+    nonempty B ->
     pi1_set (product A B) = A.
   Proof.
     intro H0; apply extensionality; split.
@@ -437,7 +478,7 @@ Section productLemmas.
   Qed.
 
   Lemma pi2_product (A : set X) (B : set Y) :
-    not_empty A ->
+    nonempty A ->
     pi2_set (product A B) = B.
   Proof.
     intro H0; apply extensionality; split.
@@ -562,3 +603,11 @@ Section tupleLemmas.
     cartesian_product (family_setwise_intersection A B).
   Proof. apply extensionality; firstorder. Qed.
 End tupleLemmas.
+
+
+(* Turn a subset into a type *)
+Section depSet.
+  Variable X : Type.
+  Variable P : X -> Prop.
+  Definition subset_type := { x : X | P x }.
+End depSet.

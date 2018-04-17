@@ -1,5 +1,6 @@
 -Q theories GrappaCoq
 
-./theories/Real.v
+./theories/Domain.v
+./theories/Pseudoreal.v
 ./theories/Set.v
 ./theories/Topology.v

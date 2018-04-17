@@ -10,6 +10,8 @@ Require Import Coq.Logic.Classical_Pred_Type.
 
 Require Import GrappaCoq.Set.
 
+Open Scope set_scope.
+
 
 Section topology.
   Variable X : Type. (* The domain *)
@@ -25,13 +27,13 @@ Section topology.
       fullAxiom  : open (@full X);
       unionAxiom : forall (C : pow X),
           (forall A : set X, C A -> open A) ->
-          open (big_union C);
+          open (⋃ C);
       intersectionAxiom : forall A B : set X,
-          open A -> open B -> open (intersection A B) }.
+          open A -> open B -> open (A ∩ B) }.
 
   Definition all_open (O : Opens) (C : pow X) := forall A, C A -> O A.
 
-  Definition finer (A B : Opens) := subset B A.
+  Definition finer (A B : Opens) := B ⊆ A.
   Definition larger (A B : Opens) := finer A B.
   Definition strictly_finer (A B : Opens) := proper_subset B A.
   Definition coarser (A B : Opens) := finer B A.
@@ -52,7 +54,7 @@ Section topology.
   Proof. firstorder. Qed.
 
   Definition interior {O : Opens} (A : set X) :=
-    big_union (fun B => open B /\ subset B A).
+    ⋃ (fun B => open B /\ subset B A).
 
   Lemma interior_open {O : Opens} {T : Topology O} (A : set X) :
     open (interior A).
@@ -79,19 +81,19 @@ Section basis.
 
   Definition basisAxiom1 (C : pow X) := forall x : X, exists b, C b /\ b x.
   Definition basisAxiom2 (C : pow X) := forall x b1 b2,
-      C b1 -> C b2 -> (intersection b1 b2) x ->
-      exists b3, C b3 /\ b3 x /\ subset b3 (intersection b1 b2).
+      C b1 -> C b2 -> (b1 ∩ b2) x ->
+      exists b3, C b3 /\ b3 x /\ subset b3 (b1 ∩ b2).
 
   Class Basis (BSet : BasisSet)
     : Type :=
     { basisAx1 : basisAxiom1 BSet;
       basisAx2 : basisAxiom2 BSet }.
 
-  Definition generate (B : pow X) := fun A => exists C, subset C B /\ big_union C = A.
+  Definition generate (B : pow X) := fun A => exists C, C ⊆ B /\ ⋃ C = A.
 
   (* Basis B generates the open sets O. *)
   Definition generates `(B : Basis) (O : Opens X) :=
-    forall (U : set X), (forall x, U x -> exists b, basis b /\ b x /\ subset b U) <-> O U.
+    forall (U : set X), (forall x, U x -> exists b, basis b /\ b x /\ b ⊆ U) <-> O U.
 
   Lemma generate_generates `(B : Basis) :
     generates B (generate basis).
@@ -135,7 +137,7 @@ Section basis.
     generates B O ->
     forall (C : pow X),
       (forall A : set X, C A -> O A) ->
-      O (big_union C).
+      O (⋃ C).
   Proof.
     intros Hgen C Hopen. unfold generates in Hgen.
     apply Hgen. intros x Hunion.
@@ -152,7 +154,7 @@ Section basis.
   Lemma basis_topology_intersection_axiom `(basis : Basis) (O : Opens X) :
     generates basis O ->
     forall A B : set X,
-      O A -> O B -> O (intersection A B).
+      O A -> O B -> O (A ∩ B).
   Proof.
     intros Hgen A B HopenA HopenB. 
     apply Hgen. intros x [H0 H1].
@@ -191,7 +193,7 @@ Section basis.
   Lemma open_union_subset_basis `(B : Basis) (O : Opens X) A :
     generates B O ->
     O A ->
-    exists C, subset C basis /\ A = big_union C.
+    exists C, C ⊆ basis /\ A = ⋃ C.
   Proof.
     intros Hgen HOA. unfold generates in Hgen.
     pose proof HOA as H0. rewrite <- Hgen in H0.
@@ -206,7 +208,7 @@ Section basis.
   Lemma all_open_subset_basis `(B : Basis) (O : Opens X) (C : pow X) :
     generates B O ->
     all_open _ C ->
-    exists D, subset D basis /\ big_union D = big_union C.
+    exists D, D ⊆ basis /\ ⋃ D = ⋃ C.
   Proof.
     intros Hgen Hopen.
     exists (fun b => basis b /\ subset b (big_union C)). split.
@@ -220,8 +222,8 @@ Section basis.
 
  Lemma subset_basis_union_open `(B : Basis) (O : Opens X) C :
     generates B O ->
-    subset C basis ->
-    O (big_union C).
+    C ⊆ basis ->
+    O (⋃ C).
   Proof.
     intros Hgen Hsubset.
     assert (H0: forall A, C A -> O A).
@@ -231,7 +233,7 @@ Section basis.
   Qed.
 
   Lemma big_union_basis_equals_domain `(B : Basis) :
-    big_union basis = (@full X).
+    ⋃ basis = (@full X).
   Proof. apply extensionality; firstorder. Qed.
 
   (** Lemma 13.1: Let B be a basis for a topology O on X. Then O
@@ -257,7 +259,7 @@ Section basis.
     Variable H0 : all_open opens C.
     Variable H1: forall U, open U ->
                       forall x, U x ->
-                           exists b, C b /\ b x /\ subset b U.
+                           exists b, C b /\ b x /\ b ⊆ U.
 
     (* First, we show that C satisfies the basis axioms. *)
     Lemma l_13_2_axiom1 : basisAxiom1 C.
@@ -288,8 +290,8 @@ Section basis.
        point we have proven that C forms a basis. *)
 
     Lemma l_13_2_1 (U : set X) :
-      (forall x : X, U x -> exists b : set X, C b /\ b x /\ subset b U) ->
-      exists D, subset D C /\ U = big_union D.
+      (forall x : X, U x -> exists b : set X, C b /\ b x /\ b ⊆ U) ->
+      exists D, D ⊆ C /\ U = ⋃ D.
     Proof.
       intro H2. exists (fun A => C A /\ subset A U).
       split. firstorder. apply extensionality; firstorder.
@@ -307,7 +309,7 @@ Section basis.
     Qed.
 
     (* The union of all basis elements equals the union of all opens. *)
-    Lemma l_13_2_unions_equal : big_union C = big_union opens.
+    Lemma l_13_2_unions_equal : ⋃ C = ⋃ opens.
     Proof.
       generalize l_13_2_generates. intro Hgen.
       apply opens_equal_all_basis_unions in Hgen.
@@ -333,7 +335,7 @@ Section basis.
       finer O' O <->
       forall x b,
         basis b -> b x ->
-        exists b', basis' b' /\ b' x /\ subset b' b.
+        exists b', basis' b' /\ b' x /\ b' ⊆ b.
     Proof.
       split.
       - intros Hfiner x b Hbasis Hbx.
@@ -358,7 +360,7 @@ Section subbasis.
   Class SubbasisSet : Type :=
     subbasis : pow X.
 
-  Definition subbasisAxiom (C : pow X) := big_union C = D.
+  Definition subbasisAxiom (C : pow X) := ⋃ C = D.
 
   Class Subbasis (SBSet : SubbasisSet)
     : Type :=
@@ -412,7 +414,7 @@ Section closed.
   Definition all_closed (C : pow X) := forall A, C A -> closed A.
 
   Definition closure (A : set X) :=
-    big_intersection (fun B => closed B /\ subset A B).
+    ⋂ (fun B => closed B /\ A ⊆ B).
 
   Lemma complement_empty_equals_domain : complement (@empty X) = D.
   Proof. apply extensionality; firstorder. Qed.
@@ -431,7 +433,7 @@ Section closed.
   Qed.
 
   Lemma arbitrary_intersections_closed (C : pow X) :
-    all_closed C -> closed (big_intersection C).
+    all_closed C -> closed (⋂ C).
   Proof.
     intro Hclosed; unfold closed.
     destruct T as [_ _ unionAxiom intersectionAxiom].
@@ -443,14 +445,14 @@ Section closed.
   Lemma finite_unions_closed (A B : set X) :
     closed A ->
     closed B ->
-    closed (union A B).
+    closed (A ∪ B).
   Proof.
     intros HclosedA HclosedB; unfold closed.
     rewrite complement_subtract_full, demorgan_2; firstorder.
   Qed.
 
   Lemma closure_subset_domain (A : set X) :
-    subset (closure A) D.
+    (closure A) ⊆ D.
   Proof. firstorder. Qed.
 
   Lemma closure_closed (A : set X) :
@@ -477,8 +479,8 @@ Section closed.
 
   Lemma subset_closure (A U : set X) :
     closed U ->
-    subset A U ->
-    subset (closure A) U.
+    A ⊆ U ->
+    (closure A) ⊆ U.
   Proof. firstorder. Qed.
 End closed.
 
@@ -691,7 +693,7 @@ Section limitPoint.
     forall U, neighborhood U x -> exists y, y <> x /\ A y /\ U y.
 
   Definition limit_point' (x : X) (A : set X) :=
-    closure (subtract A (singleton x)) x.
+    closure (A ∖ (singleton x)) x.
 
   Lemma limit_point_equiv (x : X) (A : set X) :
     limit_point x A <-> limit_point' x A.
@@ -708,7 +710,7 @@ Section limitPoint.
     the closure of A is equal to the union of A with the set of all
     limit points of A. *)
   Lemma theorem_17_6 (A : set X) :
-    closure A = union A (limit_points A).
+    closure A = A ∪ (limit_points A).
   Proof.
     apply extensionality; split.
     - intros x H1. unfold closure in H1.
@@ -722,7 +724,7 @@ Section limitPoint.
   Qed.
 
   Lemma jkdfg (A : set X) :
-    A = closure A <-> subset (limit_points A) A.
+    A = closure A <-> (limit_points A) ⊆ A.
   Proof.
     split; intro H0.
     - rewrite H0. 
@@ -735,7 +737,7 @@ Section limitPoint.
   (** Corollary 17.7: A subset of a topological space is closed if and
     only if it contains all its limit points. *)
   Lemma corollary_17_7 (A : set X) :
-    closed A <-> subset (limit_points A) A.
+    closed A <-> (limit_points A) ⊆ A.
   Proof.
     split; intro H0.
     - intros x Hx. apply closed_equals_closure in H0; auto.
@@ -775,7 +777,7 @@ Section continuous.
 
   Definition continuous_b :=
     forall A : set X,
-      subset (image f (closure A)) (closure (image f A)).
+      (image f (closure A)) ⊆ (closure (image f A)).
 
   Definition continuous_c :=
     forall B : set Y, closed B -> closed (preimage f B).
@@ -783,7 +785,7 @@ Section continuous.
   Definition continuous_at (x : X) :=
     forall (V : set Y),
       neighborhood V (f x) ->
-      exists (U : set X), neighborhood U x /\ subset (image f U) V.
+      exists (U : set X), neighborhood U x /\ (image f U) ⊆ V.
 
   Lemma theorem_18_1_1 :
     continuous -> continuous_b.
@@ -1015,7 +1017,7 @@ Section lemma1.
   Notation D := (@full X).
   Context {O : Opens X} {T : Topology O}.
   Variable B : pow X.
-  Variable pf : forall U, O U -> exists C, subset C B /\ big_union C = U.
+  Variable pf : forall U, O U -> exists C, C ⊆ B /\ ⋃ C = U.
 
   Instance basisInstance : Basis B.
   Proof.
