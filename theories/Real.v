@@ -4,466 +4,205 @@ Require Import List. Import ListNotations.
 Require Import QArith.
 Require Import Coq.micromega.Lqa.
 
-
-(** Intervals with rational endpoints. *)
-
-Section interval.
-  (* CompleteQI represents the entire space of rationals, i.e.,
-     (-infty, infty). *)
-  Inductive qI :=
-  | CompleteQI
-  | BoundedQI : Q -> Q -> qI.
-
-  (* q is in interval I. *)
-  Definition inI (I : qI) (q : Q) :=
-    match I with
-    | CompleteQI => True
-    | BoundedQI l h => l <= q /\ q <= h
-    end.
-
-  Definition qMin (a b : Q) :=
-    if Qlt_le_dec a b then a else b.
-  Definition qMax (a b : Q) :=
-    if Qlt_le_dec a b then b else a.
-
-  (* The intersection of two intervals. *)
-  Definition intersectionI (I1 I2 : qI) : qI :=
-    match I1, I2 with
-    | CompleteQI, _ => I2
-    | _, CompleteQI => I1
-    | BoundedQI l1 h1, BoundedQI l2 h2 =>
-      BoundedQI (qMax l1 l2) (qMin h1 h2)
-    end.
-
-  (* I1 is a subset of I2. *)
-  Definition subsetI (I1 I2 : qI) :=
-    forall x, inI I1 x -> inI I2 x.
-End interval.
+Require Import GrappaCoq.Domain GrappaCoq.Set.
 
 
-Section intervalFacts.
-  Lemma intersection_complete (I : qI) :
-    intersectionI I CompleteQI = I.
-  Proof. destruct I; auto. Qed.
-
-  Lemma subsetI_refl (I : qI) :
-    subsetI I I.
-  Proof. firstorder. Qed.
-
-  Lemma subsetI_trans (I1 I2 I3 : qI) :
-    subsetI I1 I2 -> subsetI I2 I3 -> subsetI I1 I3.
-  Proof. firstorder. Qed.
-
-  Lemma intersectionI_subsetI_1 (I1 I2 : qI) :
-    subsetI (intersectionI I1 I2) I1.
-  Proof.
-    intros x H0; unfold inI in *; unfold intersectionI in H0.
-    destruct I1; destruct I2; auto.
-    unfold qMax, qMin in H0.
-    destruct (Qlt_le_dec q q1); destruct (Qlt_le_dec q0 q2); lra.
-  Qed.
-
-  Lemma intersectionI_subsetI_2 (I1 I2 : qI) :
-    subsetI (intersectionI I1 I2) I2.
-  Proof.
-    intros x H0; unfold inI in *; unfold intersectionI in H0.
-    destruct I1; destruct I2; auto.
-    unfold qMax, qMin in H0.
-    destruct (Qlt_le_dec q q1); destruct (Qlt_le_dec q0 q2); lra.
-  Qed.
-
-  Lemma intersectionI_inI_1 (I1 I2 : qI) (x : Q) :
-    inI (intersectionI I1 I2) x ->
-    inI I1 x.
-  Proof.
-    intros H0; unfold inI, intersectionI, qMax, qMin in *.
-    destruct I1; destruct I2; auto.
-    destruct (Qlt_le_dec q q1); destruct (Qlt_le_dec q0 q2); lra.
-  Qed.
-
-  Lemma intersectionI_inI_2 (I1 I2 : qI) (x : Q) :
-    inI (intersectionI I1 I2) x ->
-    inI I2 x.
-  Proof.
-    intros H0; unfold inI, intersectionI, qMax, qMin in *.
-    destruct I1; destruct I2; auto.
-    destruct (Qlt_le_dec q q1); destruct (Qlt_le_dec q0 q2); lra.
-  Qed.
-
-  Lemma subsetI_intersectionI_1 (I1 I2 I3 : qI) :
-    subsetI I1 (intersectionI I2 I3) ->
-    subsetI I1 I2.
-  Proof.
-    intros H0 x H1.
-    specialize (H0 x H1).
-    eapply intersectionI_inI_1; eauto.
-  Qed.
-
-  Lemma subsetI_intersectionI_2 (I1 I2 I3 : qI) :
-    subsetI I1 (intersectionI I2 I3) ->
-    subsetI I1 I3.
-  Proof.
-    intros H0 x H1.
-    specialize (H0 x H1).
-    eapply intersectionI_inI_2; eauto.
-  Qed.
-
-  Lemma inI_intersectionI (I1 I2 : qI) (x : Q) :
-    inI I1 x ->
-    inI I2 x ->
-    inI (intersectionI I1 I2) x.
-  Proof.
-    intros H0 H1; unfold inI, intersectionI, qMax, qMin in *.
-    destruct I1; destruct I2; auto.
-    destruct (Qlt_le_dec q q1); destruct (Qlt_le_dec q0 q2); lra.
-  Qed.
-End intervalFacts.
+(** A Poset instance for Coq rationals. *)
+Section rationalPoset.
+  Instance rationalOrder : PosetOrder := Qle.
+  Program Instance rationalPoset : Poset rationalOrder.
+  Next Obligation. unfold le, rationalOrder; lra. Qed.
+  Next Obligation. unfold equiv, le, rationalOrder in *; lra. Qed.
+End rationalPoset.
 
 
-Notation "'val' x" := (proj1_sig x) (at level 10).
+(** Constructive non-negative reals extended with +∞. *)
+Section extendedReal.
+  Existing Instance rationalOrder.
+  Existing Instance rationalPoset.
 
+  Definition eRAx (A : set Q) :=
+    (forall x, x ∈ A -> 0 < x) /\ is_upper_set A /\ no_least A.
+  Definition eR := { A : set Q | eRAx A }.
 
-(** "Pseudo-reals": infinite sequences of intervals with rational
-    endpoints such that each interval is a subset of its
-    predecessor. *)
+  Definition Rle (r1 r2 : eR) :=
+    val r2 ⊆ val r1.
 
-Section pseudoReal.
-  Definition rAx (f : nat -> qI) := forall j, subsetI (f (S j)) (f j).
-  Definition R := { f : nat -> qI | rAx f }.
+  Open Scope domain_scope.
+  Instance eROrder : PosetOrder := Rle.  
 
-  (* The approximation ordering on pseudo-reals. *)
-  (* For every inverval I1 in r1, there exists an interval I2 in r2
-     such that I2 is a subset of I1. *)
-  Definition Rle (r1 r2 : R) :=
-    forall i, exists j, subsetI (val r2 j) (val r1 i).
+  Program Instance eRPoset : Poset eROrder.
+  Solve Obligations with firstorder.
 
-  (* Antisymmetry wrt strict equality seems to not hold. *)
+  Definition positive_rationals : set Q := fun x => 0 < x.
 
-  Program Definition Rbot : R :=
-    fun _ => CompleteQI.
+  Program Definition eRtop : eR := (@empty Q).
   Next Obligation. firstorder. Qed.
-End pseudoReal.
 
+  Lemma Qdiv_mult_shift :
+    forall x y z, ~ y == 0 -> x / y * z == x * z / y.
+  Proof. intros x y z Hy; field; auto. Qed.
 
-(** Ascending chains of pseudo-reals. *)
-
-Section chain.
-  Definition chainAx (g : nat -> R) := forall j, Rle (g j) (g (S j)).
-  Definition chain := { g : nat -> R | chainAx g }.
-
-  (* Finite subchains (lists). Not used at the moment. *)
-  Inductive subchainAx : list R -> chain -> nat -> Prop :=
-  | subchainNil : forall A, subchainAx nil A 0
-  | subchainCons : forall l A n,
-      subchainAx l A n ->
-      subchainAx (val A n :: l) A (S n).
-  Definition subchain A n := { l : list R | subchainAx l A n }.
-
-  Program Fixpoint subchain_of (A : chain) (n : nat) : subchain A n :=
-    match n with
-    | O => []
-    | S n' => val A n' :: subchain_of A n'
-    end.
-  Next Obligation. constructor. Qed.
+  Program Definition eRbot : eR := positive_rationals.
   Next Obligation.
-    inversion s; subst; constructor; constructor; auto.
-  Defined.
-
-  Definition subchain_intersection_i A n (C : subchain A n) i :=
-    fold_right (fun x acc => intersectionI (val x i) acc) CompleteQI (val C).
-
-  (* End subchains *)
-
-  (* x is an upper bound of chain A. *)
-  Definition upper_bound (x : R) (A : chain) :=
-    forall j, Rle (val A j) x.
-End chain.
-
-
-(* Computing the supremum of a chain of pseudo-reals. *)
-
-Section supremum.
-  (* Auxiliary function that does most of the work. *)
-  Fixpoint RsupAux (A : chain) (j k : nat) :=
-    match k with
-    | O => CompleteQI
-    | S k' => intersectionI (val (val A k') j) (RsupAux A j k')
-    end.
-
-  Lemma sup_pf1 A j k :
-    subsetI (RsupAux A j (S k)) (RsupAux A j k).
-  Proof.
-    intros x H0; apply intersectionI_subsetI_2 in H0; auto.
+    split.
+    - firstorder.
+    - split.
+      + intros x y H0 H1; unfold positive_rationals, in_set in *.
+        unfold le, rationalOrder in H0; lra.
+      + intros x H0; exists (x / (2#1)); split.
+        * unfold in_set, positive_rationals in *.
+          apply Qlt_shift_div_l; lra.
+        * unfold lt, equiv, le, in_set, rationalOrder,
+          positive_rationals in *; split.
+          -- intros [H1 H2].
+             assert (x == x / (2 # 1)) by lra.
+             assert (x * (2#1) == x / (2#1) * (2#1)).
+             { apply Qmult_inj_r; lra. }
+             rewrite Qdiv_mult_shift in H3; try lra.
+             rewrite Qdiv_mult_l in H3; lra.
+          -- apply Qle_shift_div_r; lra.
   Qed.
 
-  Lemma sup_pf2 A j k :
-    subsetI (RsupAux A (S j) k) (RsupAux A j k).
-  Proof.
-    intros x H0; induction k; auto; simpl in *.
-    assert (H1: inI ((val ((val A) k)) (S j)) x).
-    { apply intersectionI_subsetI_1 in H0; auto. }
-    assert (H2: inI (RsupAux A (S j) k) x).
-    { apply intersectionI_subsetI_2 in H0; auto. }
-    apply inI_intersectionI; auto.
-    destruct A as [q ?]; simpl in *.
-    destruct (q k) as [qI ax]; simpl in *.
-    apply ax; assumption.
-  Qed.
+  Notation "+∞" := eRtop : real_scope.
+  Open Scope real_scope.
 
-  Lemma lem1 (A : chain) j x :
-    inI (RsupAux A j (S j)) x ->
-    inI ((val ((val A) j)) j) x.
-  Proof.
-    intros H0. induction j.
-    - simpl in *. rewrite intersection_complete in H0; assumption.
-    - simpl in H0; eapply intersectionI_subsetI_1; eauto.
-  Qed.
-
-  (* The supremum of chain A. *)
-  Program Definition Rsupremum (A : chain) : R :=
-    fun j => RsupAux A j (S j).
-  Next Obligation.
-    intros i x H0.
-    assert (H1: inI ((val ((val A) (S i))) (S i)) x).
-    { apply intersectionI_subsetI_1 in H0; auto. }
-    assert (H2: inI (RsupAux A (S i) (S i)) x).
-    { apply intersectionI_subsetI_2 in H0; auto. }
-    clear H0.
-    apply inI_intersectionI.
-    - apply lem1, sup_pf2; auto.
-    - apply sup_pf1, sup_pf2; auto.
-  Qed.
-End supremum.
-
-
-Section pseudoRealFacts.
-  Lemma rAx_le (r : R) (i j : nat) :
-    (i <= j)%nat ->
-    subsetI (val r j) (val r i).
-  Proof.
-    intros H0 x H1; destruct r as [f ax]; simpl in *.
-    induction H0; auto; apply ax in H1; auto.
-  Qed.
-
-  Lemma rAx_lt (r : R) (i j : nat) :
-    (i < j)%nat ->
-    subsetI (val r j) (val r i).
-  Proof.
-    intros H0 x H1; destruct r as [f ax]; simpl in *.
-    induction H0; auto; apply ax in H1; auto.
-  Qed.
-
-  Lemma Rle_refl x : Rle x x.
+  Lemma eRtop_top :
+    forall r, r ⊑ +∞.
   Proof. firstorder. Qed.
 
-  Lemma Rle_trans x y z :
-    Rle x y -> Rle y z -> Rle x z.
+  Lemma eRbot_bot :
+    forall r, eRbot ⊑ r.
   Proof.
-    intros H0 H1 i.
-    destruct (H0 i) as [j H2]; destruct (H1 j) as [k H3].
-    exists k; intro q; eapply subsetI_trans; eauto.
+    unfold le, eROrder, Rle, eRbot.
+    intros r; destruct r; simpl; firstorder.
   Qed.
 
-  Lemma Rbot_bottom :
-    forall r, Rle Rbot r.
-  Proof. firstorder. Qed.
-
-  Lemma chainAx_trans (A : chain) (i j : nat) :
-    (i <= j)%nat ->
-    Rle (val A i) (val A j).
-  Proof.
-    intros H0; destruct A.
-    induction H0. apply Rle_refl.
-    eapply Rle_trans; eauto.
-  Qed.
-End pseudoRealFacts.
-
-
-Section supremumFacts.
-  Lemma lem2 (A : chain) j :
-    subsetI (val (Rsupremum A) j) (val (val A j) j).
-  Proof. intros ? ?; apply lem1; auto. Qed.
-
-  (* Lemma lem3 (A : chain) j : *)
-  (*   subsetI ((val (supremum A)) (S j)) ((val ((val A) j)) (S j)). *)
-  (* Proof. *)
-  (*   simpl; intros x H0. *)
-  (*   apply intersectionI_subsetI_2, intersectionI_subsetI_1 in H0. *)
-  (*   assumption. *)
-  (* Qed. *)
-
-  Lemma lem3 (A : chain) i j k :
-    (j <= i)%nat ->
-    subsetI (RsupAux A k i) (RsupAux A k j).
-  Proof.
-    intros H0 x H1.
-    induction H0; auto.
-    apply IHle. apply sup_pf1; auto.
-  Qed.
-
-  (* Lemma lem4 (A : chain) i j : *)
-  (*   (j <= i)%nat -> *)
-  (*   subsetI (supAux A i j) (supAux A j j). *)
-  (* Proof. *)
-  (*   intros H0 x H1. *)
-  (*   induction H0; auto. *)
-  (*   apply IHle. *)
-  (*   apply sup_pf2; auto. *)
-  (* Qed. *)
-
-  Lemma lem4 (A : chain) i j :
-    (j <= i)%nat ->
-    subsetI (RsupAux A i (S j)) (val (val A j) i).
-  Proof.
-    intros H0 x H1.
-    simpl in *.
-    apply intersectionI_subsetI_1 in H1; auto.
-  Qed.
-
-  Lemma lem5 (A : chain) j i :
-    (j <= i)%nat ->
-    subsetI ((val (Rsupremum A)) i) ((val ((val A) j)) i).
-  Proof.
-    intros H0.
-    assert (subsetI (RsupAux A i (S i)) (RsupAux A i (S j))).
-    { apply lem3; omega. }
-    eapply subsetI_trans. apply H. apply lem4; auto.
-  Qed.
-
-  (* [Rsupremum A] is an upper bound of A. *)
-  Lemma Rsupremum_upper_bound (A : chain) :
-    upper_bound (Rsupremum A) A.
-  Proof.
-    (* jth element in the chain *)
-    (* ith interval of that element *)
-    intros j i. exists (max j i).
-    destruct (Nat.le_decidable j i).
-    - rewrite max_r; auto.
-      induction H. apply lem2; auto.
-      apply lem5; omega.
-    - rewrite max_l; try omega.
-      apply Nat.nle_gt in H.
-      (* Since the intervals are decreasing and the jth interval comes
-         after the ith, we have that the jth interval is a subset of
-         the ith interval.
-         We also have that the jth interval of the supremum is a
-         subset of the jth interval of the element, so by transitivity
-         it's a subset of the ith interval of the element. *)
-      set (r := (val ((val A) j))).
-      assert (H0: subsetI (r j) (r i)) by (apply rAx_lt; auto).
-      assert (H1: subsetI (val (Rsupremum A) j) (r j)).
-      intros x H1. apply lem1; auto.
-      eapply subsetI_trans; eauto.
+  (** The supremum is the intersection of the sets of rationals. We
+      must also intersect with positive_rationals in case A is empty,
+      and then ensure that there is no least element. *)
+  Program Definition eRSupremum (A : set eR) : eR :=
+    without_least (⋂ image (@proj1_sig _ _) A ∩ positive_rationals).
+  Next Obligation.
+    split.
+    - intros x [[_ H0] _]; assumption.
+    - split.
+      + intros x y H0 H1.
+        destruct H1 as [H1 (z & H2 & H3)].
+        split.
+        * split.
+          -- intros B ([w (H4 & H5 & H6)] & HB & ?); simpl in *; subst.
+             eapply H5; eauto; apply H1.
+             exists (exist (fun A : set Q => eRAx A) _ (conj H4 (conj H5 H6))).
+             subst; split; auto.
+          -- unfold le, rationalOrder in H0.
+             unfold positive_rationals in *.
+             destruct H1; lra.
+        * exists z; split; auto.
+          unfold lt, equiv, le, rationalOrder in *; lra.
+      + apply no_least_without_least.
+        intros a b H0 H1 H2.
+        exists ((a + b) / (2#1)); split.
+        * assert (H3: forall c, a ⊑ c ->
+                           c ∈ ⋂ image
+                             (proj1_sig (P:=fun A : set Q => eRAx A)) A).
+          { intros c Hc B (z & H3 & ?); subst.
+            destruct H0 as [H0 H0']; specialize (H0 (val z)).
+            assert (exists x : {A : set Q | eRAx A}, x ∈ A /\ val x = val z).
+            { exists z; auto. }
+            apply H0 in H.
+            destruct z as [z (H4 & H5 & H6)]; simpl in *.
+            eapply H5; eauto. }
+          split.
+          -- apply H3; unfold lt, le, rationalOrder in *.
+             apply Qle_shift_div_l; lra.
+          -- unfold lt, equiv, le, rationalOrder in H2.
+             destruct H2 as [H2 H4].
+             destruct H0; destruct H1; unfold positive_rationals in *.
+             apply Qlt_shift_div_l; lra.
+        * unfold lt, equiv, le, rationalOrder in *.
+          destruct H2 as [H2 H3].
+          assert (a < b) by lra.
+          assert (H4: forall x y z, ~ y == 0 -> x / y * z == x * z / y).
+          { intros x y z Hy; field; auto. }
+          split.
+          -- split.
+             ++ intros [H5 H6].
+                assert (a == (a + b) / (2 # 1)) by lra.
+                assert (Hx: a * (2#1) == (a + b) / (2#1) * (2#1)).
+                { apply Qmult_inj_r; lra. }
+                rewrite H4 in Hx; try lra.
+                rewrite Qdiv_mult_l in Hx; lra.
+             ++ apply Qle_shift_div_l; lra.
+          -- split.
+             ++ intros [H5 H6].
+                assert (b == (a + b) / (2 # 1)) by lra.
+                assert (Hx: b * (2#1) == (a + b) / (2#1) * (2#1)).
+                { apply Qmult_inj_r; lra. }
+                rewrite H4 in Hx; try lra.
+                rewrite Qdiv_mult_l in Hx; lra.
+             ++ apply Qle_shift_div_r; lra.
   Qed.
 
-  (* The last element A_j of a finite prefix of a chain is an upper
-     bound of the prefix, so for every element A_i in it there is an
-     interval in A_j that is a subset of the kth interval of A_i. *)
-  Lemma lem6 (A : chain) i j k :
-    (i <= j)%nat ->
-    exists l, subsetI (val (val A j) l) (val (val A i) k).
-  Proof.
-    intros H0.
-    assert (Rle (val A i) (val A j)).
-    { apply chainAx_trans; auto. }
-    specialize (H k); auto.
+  Program Definition eRInfimum (A : set eR) : eR:=
+    big_union (image (@proj1_sig _ _) A).
+  Next Obligation.
+    split.
+    - intros x (B & ([y (Hy & ? & ?)] & H0 & H1) & H2).
+      subst; simpl in *; apply Hy; auto.
+    - split.
+      + intros x y H0 (B & ([z (? & Hz1 & ?)] & H1 & H3) & H2).
+        exists B; split; subst; firstorder; eapply Hz1; eauto.
+      + intros x (B & ([C HC] & H1 & H2) & H3); subst; simpl in *.
+        destruct HC as [H0 H2]; apply H2 in H3.
+        destruct H3 as (y & H3 & H4).
+        exists y; split; auto.
+        exists C; split; auto; eexists; eauto.
   Qed.
 
-  (* A slight generalization of lem9. *)
-  Lemma lem7 (j : nat) (P : nat -> nat -> Prop) :
-    (forall i l l', P l i -> (l <= l')%nat -> P l' i) ->
-    (forall i, (i <= j)%nat -> exists l, P l i) ->
-    exists l, forall i, (i <= j)%nat -> P l i.
+  Notation "'⊔' x" := (eRSupremum x) (at level 65) : real_scope.
+  Notation "'⊓' x" := (eRInfimum x) (at level 65) : real_scope.
+
+  Lemma eRSupremum_is_supremum (A : set eR) :
+    is_supremum (⊔ A) A.
   Proof.
-    intros H0 H1; induction j.
-    - specialize (H1 O (le_n O)).
-      destruct H1 as [l H1].
-      exists l. intros i H2.
-      assert (i = O) by omega; subst; auto.
-    - assert (H2: forall i : nat, (i <= j)%nat -> exists l : nat, P l i) by auto.
-      specialize (IHj H2); clear H2; destruct IHj as [l H3].
-      specialize (H1 (S j) (le_n (S j))); destruct H1 as [l' H1].
-      destruct (Nat.leb_spec0 l l').
-      + exists l'; intros i H2.
-        destruct (Nat.eqb_spec i (S j)); subst; auto.
-        assert (i <= j)%nat by omega.
-        eapply H0; eauto.
-      + exists l; intros i H2.
-        destruct (Nat.eqb_spec i (S j)); subst.
-        * eapply H0. apply H1. omega.
-        * apply H3; omega.
+    unfold is_supremum. split.
+    - intros y Hy x Hx; apply Hx; exists y; firstorder.
+    - intros s Hs x Hx. split. split.
+      + eapply big_intersection_largest_subset; eauto.
+        intros B (z & HB & ?); subst.
+        specialize (Hs z HB); firstorder.
+      + destruct s; destruct e; apply q; assumption.
+      + destruct s; destruct e as (H0 & H1 & H2).
+        apply H2 in Hx; destruct Hx as (y & H3 & H4).
+        exists y; split; auto; split.
+        * eapply big_intersection_largest_subset; eauto.
+          intros B (z & HB & ?); subst.
+          apply Hs; assumption.
+        * apply H0; assumption.
   Qed.
 
-  Lemma lem8 (r1 r2 : R) i l l' :
-    (l <= l')%nat ->
-    subsetI (val r2 l) (val r1 i) ->
-    subsetI (val r2 l') (val r1 i).
-  Proof.
-    intros H0 H1.
-    apply subsetI_trans with (I2:=val r2 l); auto.
-    apply rAx_le; auto.
-  Qed.
-
-  (* lem6 gives us an interval in A_j for each A_i. One of them is the
-     smallest (largest index). That interval is a subset of the kth
-     interval for every i. This means it's a subset of their
-     intersection, a fact we use below. *)
-  Lemma lem9 (A : chain) j k :
-    (forall i, (i <= j)%nat -> exists l, subsetI (val (val A j) l) (val (val A i) k)) ->
-    exists l, forall i, (i <= j)%nat ->
-              subsetI (val (val A j) l) (val (val A i) k).
-  Proof.
-    intros H0.
-    apply lem7; auto.
-    intros i l l' H1 H2. eapply lem8; eauto.
-  Qed.
-
-  (* Given the fact proven in lem9, we prove that the given interval I
-     is a subset of the kth interval of the supremum, since I is just
-     the intersection of the kth intervals of the first j elements. *)
-  Lemma lem10 (A : chain) I j k :
-    (forall i, (i <= j)%nat ->
-          subsetI I (val (val A i) k)) ->
-    subsetI I (RsupAux A k (S j)).
-  Proof.
-    generalize dependent k. induction j; intros k H0; simpl in *.
-    - rewrite intersection_complete.
-      specialize (H0 O (le_n O)); assumption.
-    - intros x H1.
-      apply inI_intersectionI.
-      + apply H0; auto.
-      + apply inI_intersectionI.
-        * apply H0; auto.
-        * specialize (IHj k).
-          assert (H2: forall i : nat, (i <= j)%nat ->
-                               subsetI I ((val ((val A) i)) k)).
-          { intros i H2; assert (H3: (i <= S j)%nat) by omega.
-            specialize (H0 i H3); auto. }
-          specialize (IHj H2); clear H2.
-          apply subsetI_intersectionI_2 in IHj; auto.
-  Qed.
-
-  (* [Rsupremum A] is "less than" any upper bound of A. *)
-  Lemma Rsupremum_le_upper_bounds (A : chain) :
-    forall b, upper_bound b A -> Rle (Rsupremum A) b.
-  Proof.
-    intros b H0 j.
-    assert (exists l, forall i, (i <= j)%nat -> subsetI (val (val A j) l)
-                                          (val (val A i) j)).
-    apply lem9. intros i' H1. apply lem6; auto.
-    destruct H as [i' H].
-    apply lem10 in H; auto.
-    specialize (H0 j i'); destruct H0 as [k H0].
-    exists k; eapply subsetI_trans; eauto.
-  Qed.
-
-  (* [Rsupremum A] is the least upper bound of A. *)
-  Lemma Rsupremum_lub (A : chain) :
-    upper_bound (Rsupremum A) A /\
-    forall s, upper_bound s A -> Rle (Rsupremum A) s.
+  Lemma eRInfimum_is_infimum (A : set eR) :
+    is_infimum (⊓ A) A.
   Proof.
     split.
-    - apply Rsupremum_upper_bound.
-    - apply Rsupremum_le_upper_bounds.
+    - intros y Hy x Hx; exists (val y); split; auto; exists y; split; auto.
+    - intros y Hy x (B & (z & H0 & ?) & H1); subst.
+      assert (y ⊑ z) by (apply Hy; auto).
+      destruct y; destruct z; simpl in *; firstorder.
   Qed.
-End supremumFacts.
+End extendedReal.
+
+(** The non-negative reals extended with +∞ form a complete lattice. *)
+Section extendedRealDomain.
+  Program Instance eRCompleteLattice :
+    @CompleteLattice _ _ eRPoset eRSupremum eRInfimum.
+  Next Obligation. apply eRSupremum_is_supremum. Qed.
+  Next Obligation. apply eRInfimum_is_infimum. Qed.
+
+  Instance eRBottom : Bottom := eRbot.
+
+  Program Instance eRPointedCompleteLattice
+    : PointedCompleteLattice eRCompleteLattice eRBottom.
+  Next Obligation. unfold bottomAxiom; apply eRbot_bot. Qed.
+End extendedRealDomain.

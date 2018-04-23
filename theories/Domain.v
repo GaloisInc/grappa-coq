@@ -5,7 +5,6 @@ Require Import Omega.
 Require Import GrappaCoq.Set.
 Open Scope set_scope.
 
-
 (** Domain theory *)
 
 
@@ -58,6 +57,7 @@ Section posetDefinitions.
 
   Definition lt (x y : X) :=
     ~ (x ~~ y) /\ x ⊑ y.
+  Notation "a '⊏' b" := (lt a b) (at level 65) : domain_scope.
 
   Definition upper_set (A : set X) :=
     fun y => exists x, x ∈ A /\ x ⊑ y.
@@ -116,7 +116,7 @@ Section posetDefinitions.
     x ∈ A /\ forall y, y ∈ A -> x ⊑ y.
 
   Definition no_least (A : set X) :=
-    forall x, x ∈ A -> exists y, y ∈ A /\ lt y x.
+    forall x, x ∈ A -> exists y, y ∈ A /\ y ⊏ x.
 
   Definition is_supremum (x : X) (A : set X) :=
     least x (ub A).
@@ -126,17 +126,11 @@ Section posetDefinitions.
     largest x (lb A).
   Notation is_meet := is_infimum.
 
-  Definition is_join_semilattice :=
-    forall x y, exists sup, is_supremum sup (doubleton x y).
-
-  Definition is_meet_semilattice :=
-    forall x y, exists inf, is_infimum inf (doubleton x y).
-
-  Definition is_lattice :=
-    is_join_semilattice /\ is_meet_semilattice.
-
   Definition is_complete_lattice :=
     forall A : set X, exists sup inf, is_supremum sup A /\ is_infimum inf A.
+
+  Definition without_least (A : set X) :=
+    fun x => x ∈ A /\ exists y, y ∈ A /\ y ⊏ x.
 End posetDefinitions.
 
 Notation "a '⊏' b" := (lt a b) (at level 65) : domain_scope.
@@ -186,9 +180,7 @@ Section posetLemmas.
     is_supremum x A ->
     is_supremum y (lower_set A) ->
     x ~~ y.
-  Proof.
-    intros H ?; apply supremum_lower in H; firstorder.
-  Qed.
+  Proof. intros H ?; apply supremum_lower in H; firstorder. Qed.
 
   Lemma infimum_upper (A : set X) (x : X) :
     is_infimum x A <-> is_infimum x (upper_set A).
@@ -197,47 +189,6 @@ Section posetLemmas.
       try (intros ? ?; apply H0; firstorder); firstorder.
   Qed.
 
-  Lemma asdf1 (C : pow X) (A : set X) (x y : X) :
-    A = ⋃ C ->
-    (forall B, B ∈ C -> exists z, is_supremum z B) ->
-    is_supremum x A -> is_supremum y (fun z => exists B, B ∈ C /\ is_supremum z B) ->
-    x ~~ y.
-  Proof.
-    set (Z := fun x0 : X => exists B : set X, B ∈ C /\ is_supremum x0 B).
-    intros H0 He H1 H2. subst.
-    assert (H0: forall x, is_supremum x (⋃ C) ->
-                     forall B y, B ∈ C -> is_supremum y B -> y ⊑ x).
-    { intros; eapply subset_sup_le; eauto; firstorder. }
-    assert (H3: upper_bound x Z).
-    { intros z H3.
-      destruct H3 as (B & H3 & H4).
-      eapply H0; eauto. }
-    assert (y ⊑ x) by firstorder.
-    assert (x ⊑ y).
-    { assert (forall a, a ∈ ⋃ C -> exists A, A ∈ C /\ a ∈ A) by firstorder.
-      assert (forall a, a ∈ ⋃ C -> exists z, z ∈ Z /\ a ⊑ z).
-      { intros a Ha. specialize (H4 a Ha).
-        destruct H4 as (A & H4 & H5).
-        specialize (He A H4).
-        destruct He as [z He].
-        exists z; firstorder. }
-      assert (forall a, a ∈ ⋃ C -> a ⊑ y).
-      { intros a Ha. specialize (H4 a Ha).
-        destruct H4 as (A & H4 & H6).
-        destruct H2 as [H2 H2'].
-        specialize (H5 a Ha). destruct H5 as (z & H5 & H7).
-        destruct P as [_ transAx]. eapply transAx; eauto. }
-    firstorder. }
-    firstorder.
-  Qed.
-
-  Lemma asdf2 (C : pow X) (A : set X) (x y : X) :
-    A = ⋃ C ->
-    (forall B, B ∈ C -> exists z, is_infimum z B) ->
-    is_infimum x A -> is_infimum y (fun z => exists B, B ∈ C /\ is_infimum z B) ->
-    x ~~ y.
-  Admitted.
-
   Lemma not_least_no_least (A : set X) :
     no_least A -> (~ exists x, least x A).
   Proof. firstorder. Qed.
@@ -245,6 +196,17 @@ Section posetLemmas.
   Lemma least_not_no_least (A : set X) :
     (exists x, least x A) -> ~ no_least A.
   Proof. firstorder. Qed.
+
+  Lemma no_least_without_least (A : set X) :
+    (forall a b, a ∈ A -> b ∈ A -> a ⊏ b -> exists c, c ∈ A /\ a ⊏ c /\ c ⊏ b) ->
+    no_least (without_least A).
+  Proof.
+    intros H0 x [H1 (y & H2 & H3)].
+    specialize (H0 y x H2 H1 H3).
+    destruct H0 as (c & H4 & H5 & H6).
+    exists c; split; auto; split; auto.
+    exists y; split; auto.
+  Qed.
 End posetLemmas.
 
 
@@ -262,41 +224,42 @@ Notation "'val' x" := (proj1_sig x) (at level 10).
 Section monotone.
   Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}.
   Variable f : X -> Y.
-  Definition monotone := forall x y, x ⊑ y -> (f x) ⊑ (f y).
+  Definition monotone := forall x y, x ⊑ y -> f x ⊑ f y.
+  Definition image (A : set X) :=
+    fun y => exists x, x ∈ A /\ f x ~~ y.
 End monotone.
 
 
-Section directedSet.
-  Context {X : Type} `{P : Poset X}.
+Section continuous.
+  Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}.
+  Variable f : X -> Y.
 
-  Definition directed (A : set X) :=
-    nonempty A /\
-    forall x y, x ∈ A -> y ∈ A -> exists a, upper_bound a (doubleton x y).
-
-  Definition directed_set := { A : set X | directed A }.
-
-  Definition ideal (A : set X) :=
-    directed A /\ is_lower_set A.
-
-  Definition filtered_set (A : set X) :=
-    directed A /\ is_upper_set A.
-
-  Definition totally_ordered (A : set X) :=
-    forall x y, x ∈ A -> y ∈ A -> x ⊑ y \/ y ⊑ x.
-
-  Definition is_chain (A : set X) :=
-    directed A /\ totally_ordered A.
-
-  Definition chain := { A : set X | is_chain A }.
-
-  (* A is cofinal in B *)
-  Definition cofinal (A B : set X) :=
-    forall b, b ∈ B -> exists a, a ∈ A /\ b ⊑ a.
-End directedSet.
+  Definition scott_continuous :=
+    forall A x, is_supremum x A -> is_supremum (f x) (image f A).
+End continuous.
 
 
-(* ω-chains are subsets of a poset that are isomorphic to the natural
-   numbers with their natural order. *)
+Section continuousLemmas.
+  Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}.
+  Variable f : X -> Y.
+
+  Lemma scott_continuous_monotone :
+    scott_continuous f -> monotone f.
+  Proof.
+    intros H0 x y H1.
+    specialize (H0 (doubleton x y) y).
+    assert (H2: forall y0 : X, doubleton x y y0 -> y0 ⊑ y).
+    { intros z Hz; destruct Hz; subst; firstorder. }
+    assert (H3: forall y0 : X, (forall y1 : X, doubleton x y y1 -> y1 ⊑ y0) -> y ⊑ y0).
+    { firstorder. }
+    specialize (H0 (conj H2 H3)); destruct H0 as [H0 H4].
+    apply H0; exists x; firstorder.
+  Qed.
+End continuousLemmas.
+
+
+(** ω-chains are subsets of a poset that are isomorphic to the natural
+    numbers with their natural order. *)
 Section omegaChain.
   Context {X : Type} `{P : Poset X}.
 
@@ -309,7 +272,7 @@ Section omegaChain.
   (* x is the supremum of ω-chain A (up to equiv). *)
   Definition omega_is_supremum (x : X) (A : omegaChain) :=
     omega_upper_bound x A /\
-    forall s, omega_upper_bound s A -> x ⊑ s.
+    forall b, omega_upper_bound b A -> x ⊑ b.
 
   Lemma omegaAx_trans (A : omegaChain) n m :
     n <= m -> val A n ⊑ val A m.
@@ -324,42 +287,30 @@ Section omegaChain.
         destruct A; auto.
   Qed.
 
-  Definition omega_is_directed (A : omegaChain) :
-    directed (fun x => exists n, val A n = x).
-  Proof.
-    split.
-    - exists (val A 0), 0; auto.
-    - intros x y Hx Hy.
-      destruct Hx as [nx Hx]; destruct Hy as [ny Hy].
-      subst; destruct (Compare_dec.dec_le nx ny).
-      + exists (val A ny). intros y Hy.
-        destruct Hy; subst.
-        * apply omegaAx_trans; assumption.
-        * firstorder.
-      + exists (val A nx). intros y Hy.
-        assert (ny <= nx) by omega.
-        destruct Hy; subst.
-        * firstorder.
-        * apply omegaAx_trans; assumption.
-  Qed.
+  Definition set_of_omegaChain (A : omegaChain) :=
+    fun x => exists n, val A n = x.
 
-  Program Definition directed_set_of_omega_chain (A : omegaChain)
-    : directed_set :=
-    fun x => exists n, A n = x.
-  Next Obligation. apply omega_is_directed. Qed.
-
-  (* A function on directed sets can also take ω-chains since they are
-     directed. *)
-  Definition omega_f_of_directed_f {A : Type} (f : directed_set -> A)
-    : omegaChain -> A :=
-    fun x => f (directed_set_of_omega_chain x).
+  Definition omegaChain_function {Y : Type} (f : set X -> Y) : omegaChain -> Y :=
+    fun A => f (set_of_omegaChain A).
 End omegaChain.
 
 Notation "ω-chain" := omegaChain.
 
 
+(* Section omegaMap. *)
+(*   Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}. *)
+(*   Variable f : X -> Y. *)
+(*   Context {pf : monotone f}. *)
+
+(*   Program Definition omegaMap (A : @omegaChain X order) *)
+(*     : (@omegaChain Y order0) := *)
+(*     fun n => f (val A n). *)
+(*   Next Obligation. intros j; apply pf; destruct A; firstorder. Qed. *)
+(* End omegaMap. *)
+
+
 (** ω-DCPOs: every ω-chain has a supremum. *)
-Section omegadcpo.
+Section omegaDCPO.
   Class OmegaSupremum `(P : Poset) : Type :=
     omegaSupremum : omegaChain -> X.
 
@@ -383,61 +334,11 @@ Section omegadcpo.
 
   Definition Poset_of_OmegaDCPO `(D : OmegaDCPO) : Poset _ := _.
   Coercion Poset_of_OmegaDCPO : OmegaDCPO >-> Poset.
-End omegadcpo.
+End omegaDCPO.
 
 
-(** DCPOs: every directed set has a supremum. *)
-Section dcpo.
-  Class DirectedSupremum `(P : Poset) : Type :=
-    dSupremum : directed_set -> X.
-
-  Class DCPO `(P : Poset) (S : DirectedSupremum P) : Type :=
-    { dcpoSupremumAx :
-        forall A : directed_set, is_supremum (dSupremum A) (val A) }.
-
-  Class PointedDCPO `(D : DCPO) (bot : Bottom) : Type :=
-    { dcpoBotAx : bottomAxiom }.
-
-  (* Coercions *)
-  Program Definition OmegaDCPO_of_DCPO `(D : DCPO) : OmegaDCPO _ :=
-    @Build_OmegaDCPO _ _ _ (omega_f_of_directed_f S0) _.
-  Next Obligation.
-    destruct D as [supAx].
-    split.
-    - intros j. specialize (supAx (directed_set_of_omega_chain A)).
-      unfold is_supremum in supAx. destruct supAx.
-      unfold omegaSupremum, omega_f_of_directed_f.
-  Admitted.
-  Coercion OmegaDCPO_of_DCPO : DCPO >-> OmegaDCPO.
-
-  Definition DCPO_of_PointedDCPO `(D : PointedDCPO) : DCPO _ := _.
-  Coercion DCPO_of_PointedDCPO : PointedDCPO >-> DCPO.
-
-  Definition PointedPoset_of_PointedDCPO `(D : PointedDCPO)
-    : PointedPoset _ _ :=
-    {| botAxiom := match D with Build_PointedDCPO _ pf => pf end |}.
-  Coercion PointedPoset_of_PointedDCPO : PointedDCPO >-> PointedPoset.
-
-  Definition Poset_of_DCPO `(D : DCPO) : Poset _ := _.
-  Coercion Poset_of_DCPO : DCPO >-> Poset.
-End dcpo.
-
-
-(** Semilattices, lattices, and complete lattices. *)
+(** Complete lattices. *)
 Section lattice.
-  Class JoinSemilattice `(P : Poset) : Type :=
-    joinSemiAx : is_join_semilattice.
-
-  Class MeetSemilattice `(P : Poset) : Type :=
-    meetSemiAx : is_meet_semilattice.
-
-  Class Lattice `(P : Poset) : Type :=
-    { joinAx : is_join_semilattice;
-      meetAx : is_meet_semilattice }.
-
-  Class PointedLattice `(L : Lattice) (bot : Bottom) : Type :=
-    { latticeBotAxiom : bottomAxiom }.
-
   Class Supremum `(P : Poset) : Type :=
     supremum : set X -> X.
 
@@ -454,18 +355,133 @@ Section lattice.
     { completeBotAxiom : bottomAxiom }.
 
   (* Coercions *)
-  Definition Lattice_of_PointedLattice `(P : PointedLattice)
-    : Lattice _ := _.
-  Coercion Lattice_of_PointedLattice : PointedLattice >-> Lattice.
-
   Definition CompleteLattice_of_PointedCompleteLattice
              `(L : PointedCompleteLattice)
     : CompleteLattice _ _ := _.
   Coercion CompleteLattice_of_PointedCompleteLattice
     : PointedCompleteLattice >-> CompleteLattice.
 
-  (* TODO: coercion to DCPO *)
+  Program Definition OmegaDCPO_of_CompleteLattice
+             `(L : CompleteLattice)
+    : OmegaDCPO _ :=
+    @Build_OmegaDCPO _ _ _ (omegaChain_function S0) _.
+  Next Obligation.
+    destruct L as [supAx].
+    specialize (supAx (set_of_omegaChain A)); destruct supAx as [H0 H1].
+    split.
+    - intros j.
+      assert (val A j ∈ set_of_omegaChain A).
+      { exists j; auto; firstorder. }
+      firstorder.
+    - intros b Hb; apply H1; intros y [n ?]; subst; auto.
+  Qed.
+  Coercion OmegaDCPO_of_CompleteLattice : CompleteLattice >-> OmegaDCPO.
 End lattice.
 
 Notation "'⊔' x" := (supremum x) (at level 65).
 Notation "'⊓' x" := (infimum x) (at level 65).
+
+
+(** ω-DCPO structure for Scott-continuous function spaces. *)
+Section functionSpace.
+  Context {X Y : Type} `{P : OmegaDCPO X} `{Q : OmegaDCPO Y}.
+
+  Definition scottFunction := { f : X -> Y | scott_continuous f }.
+
+  Instance functionOrder : PosetOrder :=
+    fun (f g : scottFunction) => forall x, val f x ⊑ val g x.
+
+  Lemma functionOrderRefl (f : scottFunction) :
+    f ⊑ f.
+  Proof. intros x; destruct P1 as [reflAx ?]; apply reflAx. Qed.
+
+  Lemma functionOrderTrans (f g h : scottFunction) :
+    f ⊑ g -> g ⊑ h -> f ⊑ h.
+  Proof.
+    intros H0 H1 x; specialize (H0 x); specialize (H1 x).
+    destruct P1 as [? transAx]; eapply transAx; eauto.
+  Qed.
+
+  Program Instance functionPoset : Poset functionOrder.
+  Next Obligation. apply functionOrderRefl. Qed.
+  Next Obligation. eapply functionOrderTrans; eauto. Qed.
+
+  Program Definition apply_chain (A : omegaChain) (x : X)
+    : @omegaChain Y _ :=
+    fun n => val A n x.
+  Next Obligation. intros j; destruct A as [A ax]; apply ax. Qed.
+
+  Program Definition functionSupremum (A : omegaChain) : scottFunction :=
+    fun x => omegaSupremum (apply_chain A x).
+  Next Obligation.
+    intros B x Hx; split.
+    - intros y (z & H0 & ?); subst.
+      assert (forall i, val (apply_chain A z) i ⊑
+                       omegaSupremum (apply_chain A x)).
+      { intros i.
+        assert (H1: is_supremum (val (val A i) x)
+                                (image (val (val A i)) B)).
+        { destruct (val A i) as [? pf]; simpl in *.
+          specialize (pf _ _ Hx); split; firstorder. }
+        destruct H1 as [H1 H2].
+        assert ((val ((val A) i)) x ⊑ omegaSupremum (apply_chain A x)).
+        { destruct Q as [supAx].
+          specialize (supAx (apply_chain A x)); firstorder. }
+        destruct P1 as [? transAx]; eapply transAx.
+        - apply H1; firstorder.
+        - assumption. }
+      destruct H; destruct P1 as [? transAx].
+      eapply transAx. apply H2. firstorder.
+    - intros y Hy.
+      assert (H0: upper_bound y (fun x => exists j y, y ∈ B /\
+                                              x ~~ val (val A j) y)).
+      { intros z Hz.
+        destruct Hz as (j & w & Hz & ?); subst.
+        assert (val (val A j) w ⊑ omegaSupremum (apply_chain A w)).
+        { destruct Q as [supAx].
+          specialize (supAx (apply_chain A w)).
+          destruct supAx; destruct H; firstorder. }
+        destruct P1 as [? transAx].
+        assert ((val ((val A) j)) w ⊑ y).
+        { eapply transAx. apply H0. apply Hy; firstorder. }
+        eapply transAx. apply H. assumption. }
+      destruct Q as [supAx].
+      specialize (supAx (apply_chain A x)).
+      destruct supAx as [_ supAx].
+      apply supAx; clear supAx; intros j.
+      assert (H1: is_supremum ((val (apply_chain A x)) j)
+                              (image (val (val A j)) B)).
+      { split.
+        - intros z (w & H1 & H2); destruct P1 as [? transAx].
+          unfold apply_chain; simpl; eapply transAx. apply H2.
+          destruct (val A j) as [f pf]; simpl in *.
+          specialize (pf B x Hx); destruct pf as [pf _].
+          apply pf; exists w; split; firstorder.
+        - intros z Hz; unfold apply_chain; simpl.
+          destruct (val A j) as [f pf]; simpl in *.
+          specialize (pf B x Hx).
+          destruct pf as [_ pf]; apply pf; assumption. }
+      destruct H1; apply H1; intros z (w & H2 & H3).
+      apply H0; exists j, w; split; firstorder.
+  Qed.
+
+  Notation "'⊔' x" := (functionSupremum x) (at level 65) : domain_scope.
+  Open Scope domain_scope.
+
+  Lemma functionSupremum_is_supremum (A : omegaChain) :
+    omega_is_supremum (⊔ A) A.
+  Proof.
+    split.
+    - intros n x; destruct Q as [supAx].
+      specialize (supAx (apply_chain A x)); firstorder.
+    - intros f Hf x; destruct Q as [supAx].
+      specialize (supAx (apply_chain A x)).
+      destruct supAx; apply H0; firstorder.
+  Qed.
+
+  Instance functionOmegaSupremum : OmegaSupremum functionPoset :=
+    functionSupremum.
+
+  Program Instance functionOmegaDCPO : OmegaDCPO functionOmegaSupremum.
+  Next Obligation. apply functionSupremum_is_supremum. Qed.
+End functionSpace.

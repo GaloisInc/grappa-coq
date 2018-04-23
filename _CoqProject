@@ -2,5 +2,6 @@
 
 ./theories/Domain.v
 ./theories/Pseudoreal.v
+./theories/Real.v
 ./theories/Set.v
 ./theories/Topology.v

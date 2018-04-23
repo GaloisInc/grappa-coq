@@ -5,8 +5,8 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 Require Import List. Import ListNotations.
-Require Import Coq.Logic.Classical_Prop.
-Require Import Coq.Logic.Classical_Pred_Type.
+(* Require Import Coq.Logic.Classical_Prop. *)
+(* Require Import Coq.Logic.Classical_Pred_Type. *)
 
 Require Import GrappaCoq.Set.
 
@@ -432,15 +432,15 @@ Section closed.
     unfold closed; rewrite complement_domain_equals_empty; firstorder.
   Qed.
 
-  Lemma arbitrary_intersections_closed (C : pow X) :
-    all_closed C -> closed (⋂ C).
-  Proof.
-    intro Hclosed; unfold closed.
-    destruct T as [_ _ unionAxiom intersectionAxiom].
-    rewrite complement_subtract_full, demorgan_1_big.
-    apply unionAxiom; intros A H0; subst.
-    destruct H0 as [c [H0 H1]]; subst; firstorder.
-  Qed.
+  (* Lemma arbitrary_intersections_closed (C : pow X) : *)
+  (*   all_closed C -> closed (⋂ C). *)
+  (* Proof. *)
+  (*   intro Hclosed; unfold closed. *)
+  (*   destruct T as [_ _ unionAxiom intersectionAxiom]. *)
+  (*   rewrite complement_subtract_full, demorgan_1_big. *)
+  (*   apply unionAxiom; intros A H0; subst. *)
+  (*   destruct H0 as [c [H0 H1]]; subst; firstorder. *)
+  (* Qed. *)
 
   Lemma finite_unions_closed (A B : set X) :
     closed A ->
@@ -455,22 +455,22 @@ Section closed.
     (closure A) ⊆ D.
   Proof. firstorder. Qed.
 
-  Lemma closure_closed (A : set X) :
-    closed (closure A).
-  Proof.
-    unfold closed, closure.
-    rewrite complement_subtract_full, demorgan_1_big.
-    destruct T as [_ _ unionAxiom _]; apply unionAxiom.
-    intros B H0; destruct H0 as [c [H1 H2]]; subst; firstorder.
-  Qed.
+  (* Lemma closure_closed (A : set X) : *)
+  (*   closed (closure A). *)
+  (* Proof. *)
+  (*   unfold closed, closure. *)
+  (*   rewrite complement_subtract_full, demorgan_1_big. *)
+  (*   destruct T as [_ _ unionAxiom _]; apply unionAxiom. *)
+  (*   intros B H0; destruct H0 as [c [H1 H2]]; subst; firstorder. *)
+  (* Qed. *)
 
-  Lemma closed_equals_closure (A : set X) :
-    closed A <-> A = closure A.
-  Proof.
-    split; intro H0.
-    - apply extensionality; firstorder.
-    - rewrite H0; apply closure_closed.
-  Qed.
+  (* Lemma closed_equals_closure (A : set X) : *)
+  (*   closed A <-> A = closure A. *)
+  (* Proof. *)
+  (*   split; intro H0. *)
+  (*   - apply extensionality; firstorder. *)
+  (*   - rewrite H0; apply closure_closed. *)
+  (* Qed. *)
 
   Lemma complement_closure_open (A : set X) :
     O (complement (closure A)).
@@ -634,42 +634,42 @@ Section theorem_17_5.
   Context (O : Opens X) (T : Topology O).
   Variable A : set X.
 
-  Lemma theorem_17_5_1 :
-    forall x, closure A x <-> forall U, neighborhood U x -> intersects U A.
-  Proof.
-    intro x. split.
-    - apply (@contrapositive
-               (closure A x)
-               (forall U : set X, neighborhood U x -> intersects (T:=X) U A)).
-      intro H0.
-      apply not_all_ex_not in H0; destruct H0 as [U H0].
-      apply imply_to_and in H0; destruct H0 as [H0 ?].
-      assert (closed (complement U)).
-      { unfold closed; rewrite complement_cancel; firstorder. }
-      assert (subset A (complement U)) by firstorder.
-      assert (subset (closure A) (complement U)).
-      { apply subset_closure; auto. }
-      firstorder.
-    - apply contrapositive; intro H0.
-      assert (H1: exists U, neighborhood U x /\ ~ intersects U A).
-      { exists (complement (closure A)). split.
-        - split. 
-          + apply complement_closure_open; auto.
-          + firstorder.
-        - firstorder. }
-      intro HC; destruct H1 as [U [H1 H2]].
-      specialize (HC U H1); congruence.
-  Qed.
+  (* Lemma theorem_17_5_1 : *)
+  (*   forall x, closure A x <-> forall U, neighborhood U x -> intersects U A. *)
+  (* Proof. *)
+  (*   intro x. split. *)
+  (*   - apply (@contrapositive *)
+  (*              (closure A x) *)
+  (*              (forall U : set X, neighborhood U x -> intersects (T:=X) U A)). *)
+  (*     intro H0. *)
+  (*     apply not_all_ex_not in H0; destruct H0 as [U H0]. *)
+  (*     apply imply_to_and in H0; destruct H0 as [H0 ?]. *)
+  (*     assert (closed (complement U)). *)
+  (*     { unfold closed; rewrite complement_cancel; firstorder. } *)
+  (*     assert (subset A (complement U)) by firstorder. *)
+  (*     assert (subset (closure A) (complement U)). *)
+  (*     { apply subset_closure; auto. } *)
+  (*     firstorder. *)
+  (*   - apply contrapositive; intro H0. *)
+  (*     assert (H1: exists U, neighborhood U x /\ ~ intersects U A). *)
+  (*     { exists (complement (closure A)). split. *)
+  (*       - split.  *)
+  (*         + apply complement_closure_open; auto. *)
+  (*         + firstorder. *)
+  (*       - firstorder. } *)
+  (*     intro HC; destruct H1 as [U [H1 H2]]. *)
+  (*     specialize (HC U H1); congruence. *)
+  (* Qed. *)
 
-  (* A simple consequence of the above theorem. *)
-  Lemma corollary_17_5_1 (U : set X) (x : X) :
-    closure A x ->
-    neighborhood U x ->
-    exists y, intersects_at A U y.
-  Proof.
-    intros H0 [? ?]; rewrite theorem_17_5_1 in H0;
-      specialize (H0 U); firstorder.
-  Qed.
+  (* (* A simple consequence of the above theorem. *) *)
+  (* Lemma corollary_17_5_1 (U : set X) (x : X) : *)
+  (*   closure A x -> *)
+  (*   neighborhood U x -> *)
+  (*   exists y, intersects_at A U y. *)
+  (* Proof. *)
+  (*   intros H0 [? ?]; rewrite theorem_17_5_1 in H0; *)
+  (*     specialize (H0 U); firstorder. *)
+  (* Qed. *)
 
 
   Section theorem_17_5_2.
@@ -706,22 +706,22 @@ Section limitPoint.
     closure A x -> A x \/ limit_points A x.
   Admitted.
 
-  (** Theorem 17.6: Let A be a subset of the topological space D. Then
-    the closure of A is equal to the union of A with the set of all
-    limit points of A. *)
-  Lemma theorem_17_6 (A : set X) :
-    closure A = A ∪ (limit_points A).
-  Proof.
-    apply extensionality; split.
-    - intros x H1. unfold closure in H1.
-      unfold big_intersection in H1.
-      assert (A x \/ limit_points A x).
-      { apply jkdfgfd; firstorder. }
-      firstorder.
-    - intros x [H1 | H1].
-      + firstorder.
-      + apply theorem_17_5_1; firstorder.
-  Qed.
+  (* (** Theorem 17.6: Let A be a subset of the topological space D. Then *)
+  (*   the closure of A is equal to the union of A with the set of all *)
+  (*   limit points of A. *) *)
+  (* Lemma theorem_17_6 (A : set X) : *)
+  (*   closure A = A ∪ (limit_points A). *)
+  (* Proof. *)
+  (*   apply extensionality; split. *)
+  (*   - intros x H1. unfold closure in H1. *)
+  (*     unfold big_intersection in H1. *)
+  (*     assert (A x \/ limit_points A x). *)
+  (*     { apply jkdfgfd; firstorder. } *)
+  (*     firstorder. *)
+  (*   - intros x [H1 | H1]. *)
+  (*     + firstorder. *)
+  (*     + apply theorem_17_5_1; firstorder. *)
+  (* Qed. *)
 
   Lemma jkdfg (A : set X) :
     A = closure A <-> (limit_points A) ⊆ A.
@@ -734,14 +734,14 @@ Section limitPoint.
       + unfold big_intersection. intros B [H1 H2].
   Admitted.
 
-  (** Corollary 17.7: A subset of a topological space is closed if and
-    only if it contains all its limit points. *)
-  Lemma corollary_17_7 (A : set X) :
-    closed A <-> (limit_points A) ⊆ A.
-  Proof.
-    split; intro H0.
-    - intros x Hx. apply closed_equals_closure in H0; auto.
-  Admitted.
+  (* (** Corollary 17.7: A subset of a topological space is closed if and *)
+  (*   only if it contains all its limit points. *) *)
+  (* Lemma corollary_17_7 (A : set X) : *)
+  (*   closed A <-> (limit_points A) ⊆ A. *)
+  (* Proof. *)
+  (*   split; intro H0. *)
+  (*   - intros x Hx. apply closed_equals_closure in H0; auto. *)
+  (* Admitted. *)
 End limitPoint.
 
 
@@ -787,16 +787,16 @@ Section continuous.
       neighborhood V (f x) ->
       exists (U : set X), neighborhood U x /\ (image f U) ⊆ V.
 
-  Lemma theorem_18_1_1 :
-    continuous -> continuous_b.
-  Proof.
-    intros H0 A y Hy.
-    destruct Hy as [x [H1 H2]]; subst.
-    apply theorem_17_5_1; auto.
-    intros V [H2 H3]; specialize (H0 V H2).
-    rewrite theorem_17_5_1 in H1; auto.
-    specialize (H1 (preimage f V)); firstorder.
-  Qed.
+  (* Lemma theorem_18_1_1 : *)
+  (*   continuous -> continuous_b. *)
+  (* Proof. *)
+  (*   intros H0 A y Hy. *)
+  (*   destruct Hy as [x [H1 H2]]; subst. *)
+  (*   apply theorem_17_5_1; auto. *)
+  (*   intros V [H2 H3]; specialize (H0 V H2). *)
+  (*   rewrite theorem_17_5_1 in H1; auto. *)
+  (*   specialize (H1 (preimage f V)); firstorder. *)
+  (* Qed. *)
 
   Lemma theorem_18_1_2 :
     continuous_b -> continuous_c.
@@ -860,7 +860,7 @@ Section homeo2.
       { rewrite bijective_preimage_image_cancel; auto. }
       apply H3 in H.
       rewrite bijective_preimage_image_cancel in H; auto.
-      rewrite inverse_image_preimage with (f':=f'); firstorder.
+      erewrite inverse_image_preimage; firstorder.
   Qed.
 End homeo2.
 
@@ -874,17 +874,17 @@ Section constructingContinuous.
   Context (O1 : Opens X) (T1 : Topology O1).
   Context (O2 : Opens Y) (T2 : Topology O2).
 
-  (* Not constructive *)
-  Lemma constant_continuous (f : X -> Y) (y : Y) :
-    constant f y ->
-    continuous f.
-  Proof.
-    intros Hc V H0. unfold constant in Hc.
-    (* Is this necessary? y is either in V or not. *)
-    destruct (classic (V y)).
-    - erewrite preimage_constant_full; firstorder.
-    - erewrite preimage_constant_empty; firstorder.
-  Qed.
+  (* (* Not constructive *) *)
+  (* Lemma constant_continuous (f : X -> Y) (y : Y) : *)
+  (*   constant f y -> *)
+  (*   continuous f. *)
+  (* Proof. *)
+  (*   intros Hc V H0. unfold constant in Hc. *)
+  (*   (* Is this necessary? y is either in V or not. *) *)
+  (*   destruct (classic (V y)). *)
+  (*   - erewrite preimage_constant_full; firstorder. *)
+  (*   - erewrite preimage_constant_empty; firstorder. *)
+  (* Qed. *)
 End constructingContinuous.
 
 

@@ -1,14 +1,14 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 Require Import List. Import ListNotations.
-Require Import Coq.Logic.Classical_Prop.
-Require Import Coq.Logic.Classical_Pred_Type.
+(* Require Import Coq.Logic.Classical_Prop. *)
+(* Require Import Coq.Logic.Classical_Pred_Type. *)
 
 
-(* Implied by the law of excluded middle *)
-Lemma contrapositive (P Q : Prop) :
-  (P -> Q) <-> (~Q -> ~P).
-Proof. firstorder; destruct (classic Q); firstorder. Qed.
+(* (* Implied by the law of excluded middle *) *)
+(* Lemma contrapositive (P Q : Prop) : *)
+(*   (P -> Q) <-> (~Q -> ~P). *)
+(* Proof. firstorder; destruct (classic Q); firstorder. Qed. *)
 
 
 Section set.
@@ -79,26 +79,6 @@ Notation "x '∉' a" := (not_in_set x a) (at level 65) : set_scope.
 Notation "a '∖' b":= (subtract a b) (at level 65) : set_scope.
 
 Open Scope set_scope.
-
-
-Section map.
-  Context {X Y : Type} (f : X -> Y).
-  Definition map (A : set X) : set Y :=
-    fun y => exists x, x ∈ A /\ f x = y.
-End map.
-
-
-Section mapLemmas.
-  Context {X Y : Type} (f : X -> Y).
-  Lemma map_empty (A : set X) :
-    is_empty A -> is_empty (map f A).
-  Proof. firstorder. Qed.
-
-  Lemma map_nonempty (A : set X) (y : Y) :
-    y ∈ map f A ->
-    nonempty A.
-  Proof. firstorder. Qed.
-End mapLemmas.
 
 
 Section power_set.
@@ -203,7 +183,7 @@ Section function.
   Variable f : X -> Y.
 
   Definition image (A : set X) :=
-    fun y => exists x, A x /\ f x = y.
+    fun y => exists x, x ∈ A /\ f x = y.
 
   Definition preimage (A : set Y) :=
     fun x => A (f x).
@@ -294,35 +274,35 @@ Section setLemmas.
         * destruct Hy as [B [H2 H3]]; subst; assumption.
   Qed.
 
-  (* Not constructive. *)
-  Lemma demorgan_1 (A B C : set T) :
-    subtract A (intersection B C) = union (subtract A B) (subtract A C).
-  Proof.
-    apply extensionality. split.
-    - intros x Hx. unfold subtract, intersection in Hx.
-      assert (H0: ~ B x \/ ~ C x) by (apply not_and_or; intuition).
-      firstorder.
-    - firstorder.
-  Qed.
+  (* (* Not constructive. *) *)
+  (* Lemma demorgan_1 (A B C : set T) : *)
+  (*   subtract A (intersection B C) = union (subtract A B) (subtract A C). *)
+  (* Proof. *)
+  (*   apply extensionality. split. *)
+  (*   - intros x Hx. unfold subtract, intersection in Hx. *)
+  (*     assert (H0: ~ B x \/ ~ C x) by (apply not_and_or; intuition). *)
+  (*     firstorder. *)
+  (*   - firstorder. *)
+  (* Qed. *)
 
   Lemma demorgan_2 (A B C : set T) :
     subtract A (union B C) = intersection (subtract A B) (subtract A C).
   Proof. apply extensionality; firstorder. Qed.
 
-  (* Not constructive. *)
-  Lemma demorgan_1_big (A : set T) (C : pow T) :
-    subtract A (big_intersection C) = big_union (big_subtract A C).
-  Proof.
-    apply extensionality. split.
-    - intros x [H0 H1].
-      assert (exists A', C A' /\ ~ A' x).
-      { apply not_all_ex_not in H1; destruct H1 as [A' H1].
-        exists A'; apply imply_to_and; assumption. }
-      destruct H as [A' [H3 H4]].
-      exists (subtract A A'). firstorder.
-    - intros x [A' [H0 H1]].
-      split; destruct H0 as [B [H2 H3]]; subst; firstorder.
-  Qed.      
+  (* (* Not constructive. *) *)
+  (* Lemma demorgan_1_big (A : set T) (C : pow T) : *)
+  (*   subtract A (big_intersection C) = big_union (big_subtract A C). *)
+  (* Proof. *)
+  (*   apply extensionality. split. *)
+  (*   - intros x [H0 H1]. *)
+  (*     assert (exists A', C A' /\ ~ A' x). *)
+  (*     { apply not_all_ex_not in H1; destruct H1 as [A' H1]. *)
+  (*       exists A'; apply imply_to_and; assumption. } *)
+  (*     destruct H as [A' [H3 H4]]. *)
+  (*     exists (subtract A A'). firstorder. *)
+  (*   - intros x [A' [H0 H1]]. *)
+  (*     split; destruct H0 as [B [H2 H3]]; subst; firstorder. *)
+  (* Qed.       *)
 
   Lemma union_binary_collection (A B : set T) :
     union A B = big_union (binary_collection A B).
@@ -353,29 +333,29 @@ Section setLemmas.
     subtract A A = @empty T.
   Proof. apply extensionality; firstorder. Qed.
 
-  (* Not constructive *)
-  Lemma subset_subtract_union (A B C : set T) :
-    subset B A ->
-    subtract A B = C ->
-    A = union B C.
-  Proof.
-    intros Hsubset Hsubtract.
-    apply extensionality; split.
-    - intros x Hx; unfold union; unfold subtract in Hsubtract.
-      rewrite <- Hsubtract; destruct (classic (B x)); firstorder.
-    - intros x [? | H]; firstorder.
-      rewrite <- Hsubtract in H; firstorder.
-  Qed.
+  (* (* Not constructive *) *)
+  (* Lemma subset_subtract_union (A B C : set T) : *)
+  (*   subset B A -> *)
+  (*   subtract A B = C -> *)
+  (*   A = union B C. *)
+  (* Proof. *)
+  (*   intros Hsubset Hsubtract. *)
+  (*   apply extensionality; split. *)
+  (*   - intros x Hx; unfold union; unfold subtract in Hsubtract. *)
+  (*     rewrite <- Hsubtract; destruct (classic (B x)); firstorder. *)
+  (*   - intros x [? | H]; firstorder. *)
+  (*     rewrite <- Hsubtract in H; firstorder. *)
+  (* Qed. *)
 
-  (* Not constructive *)
-  Lemma subtract_intersection (A B : set T) :
-    subtract A (subtract A B) = intersection A B.
-  Proof.
-    apply extensionality; split.
-    - intros ? ?; firstorder.
-      destruct (classic (B x)); auto; contradiction.
-    - firstorder.
-  Qed.
+  (* (* Not constructive *) *)
+  (* Lemma subtract_intersection (A B : set T) : *)
+  (*   subtract A (subtract A B) = intersection A B. *)
+  (* Proof. *)
+  (*   apply extensionality; split. *)
+  (*   - intros ? ?; firstorder. *)
+  (*     destruct (classic (B x)); auto; contradiction. *)
+  (*   - firstorder. *)
+  (* Qed. *)
 
   Lemma intersection_subset (A B : set T) :
     subset A B ->
@@ -393,21 +373,21 @@ Section setLemmas.
     congruence.
   Qed.
 
-  (* Not constructive *)
-  Lemma subtract_intersection_disjoint2 (A B C : set T) :
-    subtract A B = intersection B C ->
-    disjoint A C.
-  Proof.
-    intro Hsub.
-    intros x [? ?].
-    destruct (classic (B x)).
-    - assert (~subtract A B x) by firstorder.
-      assert (intersection B C x) by firstorder.
-      congruence.
-    - assert (subtract A B x) by firstorder.
-      assert (~intersection B C x) by firstorder.
-      congruence.
-  Qed.
+  (* (* Not constructive *) *)
+  (* Lemma subtract_intersection_disjoint2 (A B C : set T) : *)
+  (*   subtract A B = intersection B C -> *)
+  (*   disjoint A C. *)
+  (* Proof. *)
+  (*   intro Hsub. *)
+  (*   intros x [? ?]. *)
+  (*   destruct (classic (B x)). *)
+  (*   - assert (~subtract A B x) by firstorder. *)
+  (*     assert (intersection B C x) by firstorder. *)
+  (*     congruence. *)
+  (*   - assert (subtract A B x) by firstorder. *)
+  (*     assert (~intersection B C x) by firstorder. *)
+  (*     congruence. *)
+  (* Qed. *)
 
   Lemma finite_intersection_app (l1 l2 : list (set T)) (x : T) :
     finite_intersection l1 x ->
@@ -426,20 +406,21 @@ Section setLemmas.
   Lemma complement_subtract_full (A : set T) : complement A = subtract (@full T) A.
   Proof. apply extensionality; firstorder. Qed.
 
-  Lemma complement_intersection_union (A B : set T) :
-    complement (intersection A B) = union (complement A) (complement B).
-  Proof.
-    rewrite !complement_subtract_full; apply demorgan_1.
-  Qed.
-
   (* Non constructive *)
-  Lemma complement_cancel (A : set T) :
-    complement (complement A) = A.
-  Proof.
-    apply extensionality; split.
-    - intros x Hx; apply NNPP; assumption.
-    - firstorder.
-  Qed.
+  (* Lemma complement_intersection_union (A B : set T) : *)
+  (*   complement (intersection A B) = union (complement A) (complement B). *)
+  (* Proof. *)
+  (*   rewrite !complement_subtract_full; apply demorgan_1. *)
+  (* Qed. *)
+
+  (* (* Non constructive *) *)
+  (* Lemma complement_cancel (A : set T) : *)
+  (*   complement (complement A) = A. *)
+  (* Proof. *)
+  (*   apply extensionality; split. *)
+  (*   - intros x Hx; apply NNPP; assumption. *)
+  (*   - firstorder. *)
+  (* Qed. *)
 
   Lemma is_empty_empty :
     is_empty (@empty T).
@@ -452,6 +433,11 @@ Section setLemmas.
     - apply extensionality; firstorder.
     - subst. firstorder.
   Qed.
+
+  Lemma big_intersection_largest_subset (C : pow T) (A : set T) :
+    (forall B, B ∈ C -> A ⊆ B) ->
+    A ⊆ ⋂ C.
+  Proof. firstorder. Qed.
 End setLemmas.
 
 
@@ -506,21 +492,20 @@ Section productLemmas.
   Proof. firstorder. Qed.
 End productLemmas.
 
-
 Section functionLemmas.
-  Variable X Y : Type.
+  Context {X Y : Type} (f : X -> Y).
 
-  Lemma inverse_comm (f : X -> Y) (f' : Y -> X) :
+  Lemma inverse_comm (f' : Y -> X) :
     inverse f f' <-> inverse f' f.
   Proof. firstorder. Qed.
 
   (* Seems impossible :( *)
-  (* Lemma bijective_exists_inverse (f : X -> Y) : *)
+  (* Lemma bijective_exists_inverse : *)
   (*   bijective f -> *)
   (*   exists f', inverse f f'. *)
   (* Admitted. *)
 
-  Lemma inverse_bijective (f : X -> Y) (f' : Y -> X) :
+  Lemma inverse_bijective (f' : Y -> X) :
     inverse f f' ->
     bijective f.
   Proof.
@@ -532,7 +517,7 @@ Section functionLemmas.
       exists (f' y); assumption.
   Qed.
 
-  Lemma bijective_preimage_image_cancel (f : X -> Y) U :
+  Lemma bijective_preimage_image_cancel U :
     bijective f ->
     preimage f (image f U) = U.
   Proof.
@@ -542,7 +527,7 @@ Section functionLemmas.
     - firstorder.
   Qed.
 
-  Lemma bijective_image_preimage_cancel (f : X -> Y) U :
+  Lemma bijective_image_preimage_cancel U :
     bijective f ->
     image f (preimage f U) = U.
   Proof.
@@ -551,7 +536,7 @@ Section functionLemmas.
     - intros y ?; destruct (Hsur y); subst; firstorder.
   Qed.
 
-  Lemma inverse_image_preimage (f : X -> Y) (f' : Y -> X) :
+  Lemma inverse_image_preimage (f' : Y -> X) :
     inverse f f' ->
     forall U, image f U = preimage f' U.
   Proof.
@@ -561,7 +546,7 @@ Section functionLemmas.
     - intros x ?; exists (f' x); firstorder.
   Qed.
 
-  Lemma preimage_constant_empty (f : X -> Y) (V : set Y) (y : Y) :
+  Lemma preimage_constant_empty (V : set Y) (y : Y) :
     constant f y ->
     ~ V y ->
     preimage f V = @empty X.
@@ -572,7 +557,7 @@ Section functionLemmas.
     - firstorder.
   Qed.
 
-  Lemma preimage_constant_full (f : X -> Y) (V : set Y) (y : Y) :
+  Lemma preimage_constant_full (V : set Y) (y : Y) :
     constant f y ->
     V y ->
     preimage f V = @full X.
@@ -581,6 +566,15 @@ Section functionLemmas.
     - firstorder.
     - intros x ?; specialize (H0 x); subst; assumption.
   Qed.
+
+  Lemma image_empty (A : set X) :
+    is_empty A -> is_empty (image f A).
+  Proof. firstorder. Qed.
+
+  Lemma image_nonempty (A : set X) (y : Y) :
+    y ∈ image f A ->
+    nonempty A.
+  Proof. firstorder. Qed.
 End functionLemmas.
 
 
