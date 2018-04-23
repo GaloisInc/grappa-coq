@@ -221,6 +221,16 @@ End pointedPosetLemmas.
 Notation "'val' x" := (proj1_sig x) (at level 10).
 
 
+Section directed.
+  Context {X : Type} `{P : Poset X}.
+
+  Definition directed (A : set X) :=
+    nonempty A /\
+    forall x y, x ∈ A -> y ∈ A -> exists a, upper_bound a (doubleton x y).
+
+  Definition directed_set := { A : set X | directed A }.
+End directed.
+
 Section monotone.
   Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}.
   Variable f : X -> Y.
@@ -235,7 +245,7 @@ Section continuous.
   Variable f : X -> Y.
 
   Definition scott_continuous :=
-    forall A x, is_supremum x A -> is_supremum (f x) (image f A).
+    forall A x, directed A -> is_supremum x A -> is_supremum (f x) (image f A).
 End continuous.
 
 
@@ -252,7 +262,16 @@ Section continuousLemmas.
     { intros z Hz; destruct Hz; subst; firstorder. }
     assert (H3: forall y0 : X, (forall y1 : X, doubleton x y y1 -> y1 ⊑ y0) -> y ⊑ y0).
     { firstorder. }
-    specialize (H0 (conj H2 H3)); destruct H0 as [H0 H4].
+    assert (H4: directed (doubleton x y)).
+    { unfold directed. split.
+      - exists x. firstorder.
+      - intros x' y' Hx' Hy'.
+        destruct Hx'; destruct Hy'; subst.
+        + exists x; intros y' [? | ?]; subst; firstorder.
+        + exists y; intros y' [? | ?]; subst; firstorder.
+        + exists y; intros y' [? | ?]; subst; firstorder.
+        + exists y; intros y' [? | ?]; subst; firstorder. }
+    specialize (H0 H4 (conj H2 H3)); destruct H0 as [H0 _].
     apply H0; exists x; firstorder.
   Qed.
 End continuousLemmas.
@@ -288,10 +307,26 @@ Section omegaChain.
   Qed.
 
   Definition set_of_omegaChain (A : omegaChain) :=
-    fun x => exists n, val A n = x.
+    fun x => exists j, val A j = x.
 
   Definition omegaChain_function {Y : Type} (f : set X -> Y) : omegaChain -> Y :=
     fun A => f (set_of_omegaChain A).
+
+  Lemma omega_upper_bound_upper_bound (x : X) (A : omegaChain) :
+    omega_upper_bound x A <-> upper_bound x (set_of_omegaChain A).
+  Proof.
+    split.
+    - intros H0 y Hy; destruct Hy as [j ?]; subst; auto.
+    - intros H0 j; apply H0; exists j; auto.
+  Qed.
+
+  Lemma omega_is_supremum_is_supremum (x : X) (A : omegaChain) :
+    omega_is_supremum x A <-> is_supremum x (set_of_omegaChain A).
+  Proof.
+    split; intros H0; split;
+      try (intros ? ?; destruct H0 as [_ H0]; apply H0);
+      apply omega_upper_bound_upper_bound; firstorder.
+  Qed.
 End omegaChain.
 
 Notation "ω-chain" := omegaChain.
@@ -414,15 +449,15 @@ Section functionSpace.
   Program Definition functionSupremum (A : omegaChain) : scottFunction :=
     fun x => omegaSupremum (apply_chain A x).
   Next Obligation.
-    intros B x Hx; split.
-    - intros y (z & H0 & ?); subst.
+    intros B x Hd Hx; split.
+    - intros y (z & H0 & ?).
       assert (forall i, val (apply_chain A z) i ⊑
                        omegaSupremum (apply_chain A x)).
       { intros i.
         assert (H1: is_supremum (val (val A i) x)
                                 (image (val (val A i)) B)).
         { destruct (val A i) as [? pf]; simpl in *.
-          specialize (pf _ _ Hx); split; firstorder. }
+          specialize (pf _ _ Hd Hx); split; firstorder. }
         destruct H1 as [H1 H2].
         assert ((val ((val A) i)) x ⊑ omegaSupremum (apply_chain A x)).
         { destruct Q as [supAx].
@@ -455,11 +490,11 @@ Section functionSpace.
         - intros z (w & H1 & H2); destruct P1 as [? transAx].
           unfold apply_chain; simpl; eapply transAx. apply H2.
           destruct (val A j) as [f pf]; simpl in *.
-          specialize (pf B x Hx); destruct pf as [pf _].
+          specialize (pf B x Hd Hx); destruct pf as [pf _].
           apply pf; exists w; split; firstorder.
         - intros z Hz; unfold apply_chain; simpl.
           destruct (val A j) as [f pf]; simpl in *.
-          specialize (pf B x Hx).
+          specialize (pf B x Hd Hx).
           destruct pf as [_ pf]; apply pf; assumption. }
       destruct H1; apply H1; intros z (w & H2 & H3).
       apply H0; exists j, w; split; firstorder.
