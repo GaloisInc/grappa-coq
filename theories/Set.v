@@ -12,22 +12,22 @@ Require Import List. Import ListNotations.
 
 
 Section set.
-  Variable T : Type.
+  Variable X : Type.
 
-  Definition set := T -> Prop.
+  Definition set := X -> Prop.
   Definition union (A B : set) :=
     fun x => A x \/ B x.
   Definition intersection (A B : set) :=
     fun x => A x /\ B x.
 
-  Definition singleton (x : T) :=
+  Definition singleton (x : X) :=
     fun y => x = y.
 
-  Definition doubleton (x y : T) :=
+  Definition doubleton (x y : X) :=
     fun z => z = x \/ z = y.
 
-  Definition empty := fun _ : T => False.
-  Definition full := fun _ : T => True.
+  Definition empty := fun _ : X => False.
+  Definition full := fun _ : X => True.
 
   Definition subset (A B : set) := forall x, A x -> B x.
   Definition proper_subset (A B : set) := subset A B /\ exists x, B x /\ ~ A x.
@@ -53,16 +53,16 @@ Section set.
   Definition intersects (A B : set) :=
     nonempty (intersection A B).
 
-  Definition intersects_at (A B : set) (x : T) :=
+  Definition intersects_at (A B : set) (x : X) :=
     A x /\ B x.
 
   Definition finite_intersection (l : list set) :=
     fold_right (fun x acc => intersection x acc) full l.
 
-  Definition in_set (x : T) (A : set) :=
+  Definition in_set (x : X) (A : set) :=
     A x.
 
-  Definition not_in_set (x : T) (A : set) :=
+  Definition not_in_set (x : X) (A : set) :=
     ~ A x.
 
   Axiom extensionality : forall A B : set, subset A B /\ subset B A -> A = B.
@@ -109,11 +109,11 @@ End product.
 
 
 Section arbitrary.
-  Variable T : Type.
-  Definition big_union (C : pow T) :=
+  Variable X : Type.
+  Definition big_union (C : pow X) :=
     fun x => exists A, C A /\ A x.
 
-  Definition big_intersection (C : pow T) :=
+  Definition big_intersection (C : pow X) :=
     fun x => forall A, C A -> A x.
 
   (* (* Wrt a domain D instead of the entire space of T. *) *)
@@ -121,18 +121,76 @@ Section arbitrary.
   (*   (* fun x => forall A, C A -> A x /\ D x. *) *)
   (*   intersection (big_intersection C) D. *)
 
-  Definition all_unions (A : pow T) :=
+  Definition all_unions (A : pow X) :=
     fun B => exists C, subset C A /\ B = (big_union C).
 
-  Definition big_subtract (A : set T) (C : pow T) :=
+  Definition big_subtract (A : set X) (C : pow X) :=
     fun B => exists c, C c /\ B = subtract A c.
 
-  Definition binary_collection (A B : set T) :=
+  Definition binary_collection (A B : set X) :=
     fun X => X = A \/ X = B.
+
+  Definition all_disjoint (C : pow X) :=
+    forall A B, A ∈ C -> B ∈ C -> disjoint A B.
 End arbitrary.
 
 Notation "'⋃' c" := (big_union c) (at level 15) : set_scope.
 Notation "'⋂' c" := (big_intersection c) (at level 15) : set_scope.
+
+
+Section countable.
+  Variable X : Type.
+
+  Definition sequence := nat -> X.
+
+  Definition set_of_sequence (A : sequence) : set X :=
+    fun x => exists i, A i = x.
+
+  (* Finite prefix of a sequence *)
+  Fixpoint prefix (A : sequence) (n : nat) : list X :=
+    match n with
+    | O => nil
+    | S n' => prefix A n' ++ [A n']
+    end.
+
+  Definition map_sequence {Y : Type} (f : X -> Y) (A : sequence) :=
+    fun i => f (A i).
+
+  Definition sequence_of_sets := nat -> set X.
+
+  (* Equivalent to [big_union (set_of_sequence C)] *)
+  Definition countable_union (C : sequence_of_sets) : set X :=
+    fun x => exists n, x ∈ C n.
+
+  (* Equivalent to [all_disjoint (set_of_sequence C)] *)
+  Definition countable_disjoint (C : sequence_of_sets) :=
+    forall i j, disjoint (C i) (C j).
+End countable.
+
+
+Section countableLemmas.
+  Variable X : Type.
+
+  Lemma countable_union_big_union (C : sequence (set X)) :
+    countable_union C = big_union (set_of_sequence C).
+  Proof.
+    apply extensionality; split.
+    - intros ? [n ?].
+      exists (C n); split; auto; exists n; easy.
+    - intros ? (? & [? ?] & ?); subst; firstorder.
+  Qed.
+
+  Lemma countable_disjoint_all_disjoint (C : sequence (set X)) :
+    countable_disjoint C <-> all_disjoint (set_of_sequence C).
+  Proof.
+    split.
+    - intros ? ? ? [? ?] [? ?] ? ?; subst; firstorder.
+    - intros H0 i j ? ?.
+      assert (H3: C i ∈ set_of_sequence C) by (exists i; easy).
+      assert (H4: C j ∈ set_of_sequence C) by (exists j; easy).
+      specialize (H0 _ _ H3 H4). eapply H0. eauto.
+  Qed.
+End countableLemmas.
 
 
 Section tuple.
@@ -179,8 +237,7 @@ End tuple.
 
 
 Section function.
-  Variable X Y : Type.
-  Variable f : X -> Y.
+  Context {X Y : Type} (f : X -> Y).
 
   Definition image (A : set X) :=
     fun y => exists x, x ∈ A /\ f x = y.

@@ -40,6 +40,12 @@ Section interval.
   (* I1 is a subset of I2. *)
   Definition subsetI (I1 I2 : qI) :=
     forall x, inI I1 x -> inI I2 x.
+
+  Definition set_of_qI (I : qI) : set Q :=
+    match I with
+    | CompleteQI => fun _ => True
+    | BoundedQI l h => fun q => l <= q /\ q <= h
+    end.
 End interval.
 
 Notation "x '∈' a" := (inI a x) (at level 65).
@@ -128,7 +134,7 @@ Notation "'val' x" := (proj1_sig x) (at level 10).
     predecessor. *)
 
 Section pseudoReal.
-  Definition rAx (f : nat -> qI) := forall j, (f (S j)) ⊆ (f j).
+  Definition rAx (f : nat -> qI) := forall j, f (S j) ⊆ f j.
   Definition R := { f : nat -> qI | rAx f }.
 
   (* The approximation ordering on pseudo-reals. *)
@@ -137,107 +143,18 @@ Section pseudoReal.
   Definition Rle (r1 r2 : R) :=
     forall i, exists j, subsetI (val r2 j) (val r1 i).
 
-  (* Antisymmetry wrt strict equality seems to not hold. *)
-
   Program Definition Rbot : R :=
     fun _ => CompleteQI.
   Next Obligation. firstorder. Qed.
+
+  Definition R_in_qI (r : R) (I : qI) :=
+    exists i, val r i ⊆ I.
+
+  Definition R_in_set (r : R) (A : set Q) :=
+    exists i, forall q, q ∈ val r i -> A q.
 End pseudoReal.
 
 Notation "x '⊑' y" := (Rle x y) (at level 65).
-
-
-(** Ascending chains of pseudo-reals. *)
-
-Section chain.
-  Definition chainAx (g : nat -> R) := forall j, (g j) ⊑ (g (S j)).
-  Definition chain := { g : nat -> R | chainAx g }.
-
-  (* Finite subchains (lists). Not used at the moment. *)
-  Inductive subchainAx : list R -> chain -> nat -> Prop :=
-  | subchainNil : forall A, subchainAx nil A 0
-  | subchainCons : forall l A n,
-      subchainAx l A n ->
-      subchainAx (val A n :: l) A (S n).
-  Definition subchain A n := { l : list R | subchainAx l A n }.
-
-  Program Fixpoint subchain_of (A : chain) (n : nat) : subchain A n :=
-    match n with
-    | O => []
-    | S n' => val A n' :: subchain_of A n'
-    end.
-  Next Obligation. constructor. Qed.
-  Next Obligation.
-    inversion s; subst; constructor; constructor; auto.
-  Defined.
-
-  Definition subchain_intersection_i A n (C : subchain A n) i :=
-    fold_right (fun x acc => val x i ∩ acc) CompleteQI (val C).
-
-  (* End subchains *)
-
-  (* x is an upper bound of chain A. *)
-  Definition upper_bound (x : R) (A : chain) :=
-    forall j, Rle (val A j) x.
-End chain.
-
-
-(* Computing the supremum of a chain of pseudo-reals. *)
-
-Section supremum.
-  (* Auxiliary function that does most of the work. *)
-  Fixpoint RsupAux (A : chain) (j k : nat) :=
-    match k with
-    | O => CompleteQI
-    | S k' => val (val A k') j ∩ RsupAux A j k'
-    end.
-
-  Lemma sup_pf1 A j k :
-    RsupAux A j (S k) ⊆ RsupAux A j k.
-  Proof.
-    intros x H0; apply intersectionI_subsetI_2 in H0; auto.
-  Qed.
-
-  Lemma sup_pf2 A j k :
-    RsupAux A (S j) k ⊆ RsupAux A j k.
-  Proof.
-    intros x H0; induction k; auto; simpl in *.
-    assert (H1: inI ((val ((val A) k)) (S j)) x).
-    { apply intersectionI_subsetI_1 in H0; auto. }
-    assert (H2: inI (RsupAux A (S j) k) x).
-    { apply intersectionI_subsetI_2 in H0; auto. }
-    apply inI_intersectionI; auto.
-    destruct A as [q ?]; simpl in *.
-    destruct (q k) as [qI ax]; simpl in *.
-    apply ax; assumption.
-  Qed.
-
-  Lemma lem1 (A : chain) j x :
-    x ∈ RsupAux A j (S j) ->
-    x ∈ val ((val A) j) j.
-  Proof.
-    intros H0. induction j.
-    - simpl in *. rewrite intersection_complete in H0; assumption.
-    - simpl in H0; eapply intersectionI_subsetI_1; eauto.
-  Qed.
-
-  (* The supremum of chain A. *)
-  Program Definition Rsupremum (A : chain) : R :=
-    fun j => RsupAux A j (S j).
-  Next Obligation.
-    intros i x H0.
-    assert (H1: inI ((val ((val A) (S i))) (S i)) x).
-    { apply intersectionI_subsetI_1 in H0; auto. }
-    assert (H2: inI (RsupAux A (S i) (S i)) x).
-    { apply intersectionI_subsetI_2 in H0; auto. }
-    apply inI_intersectionI.
-    - apply lem1, sup_pf2; auto.
-    - apply sup_pf1, sup_pf2; auto.
-  Qed.
-End supremum.
-
-Notation "'⊔' r" := (Rsupremum r) (at level 65) : pseudoreal_scope.
-Open Scope pseudoreal_scope.
 
 
 Section pseudoRealFacts.
@@ -271,32 +188,95 @@ Section pseudoRealFacts.
   Lemma Rbot_bottom :
     forall r, Rbot ⊑ r.
   Proof. firstorder. Qed.
-
-  Lemma chainAx_trans (A : chain) (i j : nat) :
-    (i <= j)%nat ->
-    val A i ⊑ val A j.
-  Proof.
-    intros H0; destruct A.
-    induction H0. apply Rle_refl.
-    eapply Rle_trans; eauto.
-  Qed.
 End pseudoRealFacts.
 
 
+(** Poset instance for pseudo-reals. *)
+Section pseudoRealPoset.
+  Open Scope domain_scope.
+  Instance pseudoRealOrder : PosetOrder := Rle.
+
+  Program Instance pseudoRealPoset : Poset pseudoRealOrder.
+  Next Obligation. apply Rle_refl. Qed.
+  Next Obligation. eapply Rle_trans; eauto. Qed.
+
+  Instance pseudoRealBottom : Bottom := Rbot.
+
+  Program Instance pseudoRealPointedPoset
+    : PointedPoset pseudoRealPoset pseudoRealBottom.
+  Next Obligation. unfold bottomAxiom; apply Rbot_bottom. Qed.
+End pseudoRealPoset.
+
+Existing Instance pseudoRealOrder.
+Existing Instance pseudoRealPoset.
+
+
+(** Computing the supremum of a chain of pseudo-reals.
+    The supremum is a sequence [f] such that [f j] is the intersection
+    of the jth elements of the first j+1 pseudo-reals in the chain. *)
+
+Section supremum.
+  (* Auxiliary function that does most of the work. *)
+  Fixpoint RsupAux (A : omegaChain) (j k : nat) :=
+    match k with
+    | O => CompleteQI
+    | S k' => val (val A k') j ∩ RsupAux A j k'
+    end.
+
+  Lemma sup_pf1 A j k :
+    RsupAux A j (S k) ⊆ RsupAux A j k.
+  Proof.
+    intros x H0; apply intersectionI_subsetI_2 in H0; auto.
+  Qed.
+
+  Lemma sup_pf2 A j k :
+    RsupAux A (S j) k ⊆ RsupAux A j k.
+  Proof.
+    intros x H0; induction k; auto; simpl in *.
+    assert (H1: inI ((val ((val A) k)) (S j)) x).
+    { apply intersectionI_subsetI_1 in H0; auto. }
+    assert (H2: inI (RsupAux A (S j) k) x).
+    { apply intersectionI_subsetI_2 in H0; auto. }
+    apply inI_intersectionI; auto.
+    destruct A as [q ?]; simpl in *.
+    destruct (q k) as [qI ax]; simpl in *.
+    apply ax; assumption.
+  Qed.
+
+  Lemma lem1 (A : omegaChain) j x :
+    x ∈ RsupAux A j (S j) ->
+    x ∈ val ((val A) j) j.
+  Proof.
+    intros H0. induction j.
+    - simpl in *. rewrite intersection_complete in H0; assumption.
+    - simpl in H0; eapply intersectionI_subsetI_1; eauto.
+  Qed.
+
+  (** The supremum of chain A. *)
+  Program Definition Rsupremum (A : omegaChain) : R :=
+    fun j => RsupAux A j (S j).
+  Next Obligation.
+    intros i x H0.
+    assert (H1: inI ((val ((val A) (S i))) (S i)) x).
+    { apply intersectionI_subsetI_1 in H0; auto. }
+    assert (H2: inI (RsupAux A (S i) (S i)) x).
+    { apply intersectionI_subsetI_2 in H0; auto. }
+    apply inI_intersectionI.
+    - apply lem1, sup_pf2; auto.
+    - apply sup_pf1, sup_pf2; auto.
+  Qed.
+End supremum.
+
+Notation "'⊔' r" := (Rsupremum r) (at level 65) : pseudoreal_scope.
+Open Scope pseudoreal_scope.
+
+
 Section supremumFacts.
-  Lemma lem2 (A : chain) j :
+  Lemma lem2 (A : omegaChain) j :
     val (⊔ A) j ⊆ val (val A j) j.
   Proof. intros ? ?; apply lem1; auto. Qed.
 
-  (* Lemma lem3 (A : chain) j : *)
-  (*   subsetI ((val (supremum A)) (S j)) ((val ((val A) j)) (S j)). *)
-  (* Proof. *)
-  (*   simpl; intros x H0. *)
-  (*   apply intersectionI_subsetI_2, intersectionI_subsetI_1 in H0. *)
-  (*   assumption. *)
-  (* Qed. *)
-
-  Lemma lem3 (A : chain) i j k :
+  Lemma lem3 (A : omegaChain) i j k :
     (j <= i)%nat ->
     RsupAux A k i ⊆ RsupAux A k j.
   Proof.
@@ -305,17 +285,7 @@ Section supremumFacts.
     apply IHle. apply sup_pf1; auto.
   Qed.
 
-  (* Lemma lem4 (A : chain) i j : *)
-  (*   (j <= i)%nat -> *)
-  (*   subsetI (supAux A i j) (supAux A j j). *)
-  (* Proof. *)
-  (*   intros H0 x H1. *)
-  (*   induction H0; auto. *)
-  (*   apply IHle. *)
-  (*   apply sup_pf2; auto. *)
-  (* Qed. *)
-
-  Lemma lem4 (A : chain) i j :
+  Lemma lem4 (A : omegaChain) i j :
     (j <= i)%nat ->
     RsupAux A i (S j) ⊆ val (val A j) i.
   Proof.
@@ -324,7 +294,7 @@ Section supremumFacts.
     apply intersectionI_subsetI_1 in H1; auto.
   Qed.
 
-  Lemma lem5 (A : chain) j i :
+  Lemma lem5 (A : omegaChain) j i :
     (j <= i)%nat ->
     val (⊔ A) i ⊆ (val ((val A) j)) i.
   Proof.
@@ -334,9 +304,9 @@ Section supremumFacts.
     eapply subsetI_trans. apply H. apply lem4; auto.
   Qed.
 
-  (* [Rsupremum A] is an upper bound of A. *)
-  Lemma Rsupremum_upper_bound (A : chain) :
-    upper_bound (⊔ A) A.
+  (** [Rsupremum A] is an upper bound of A. *)
+  Lemma Rsupremum_upper_bound (A : omegaChain) :
+    omega_upper_bound (⊔ A) A.
   Proof.
     (* jth element in the chain *)
     (* ith interval of that element *)
@@ -360,16 +330,17 @@ Section supremumFacts.
       eapply subsetI_trans; eauto.
   Qed.
 
+  Existing Instance pseudoRealPoset.
   (* The last element A_j of a finite prefix of a chain is an upper
      bound of the prefix, so for every element A_i in it there is an
      interval in A_j that is a subset of the kth interval of A_i. *)
-  Lemma lem6 (A : chain) i j k :
+  Lemma lem6 (A : omegaChain) i j k :
     (i <= j)%nat ->
     exists l, val (val A j) l ⊆ val (val A i) k.
   Proof.
     intros H0.
     assert (Rle (val A i) (val A j)).
-    { apply chainAx_trans; auto. }
+    { apply omegaAx_trans; auto. }
     specialize (H k); auto.
   Qed.
 
@@ -412,7 +383,7 @@ Section supremumFacts.
      smallest (largest index). That interval is a subset of the kth
      interval for every i. This means it's a subset of their
      intersection, a fact we use below. *)
-  Lemma lem9 (A : chain) j k :
+  Lemma lem9 (A : omegaChain) j k :
     (forall i, (i <= j)%nat ->
           exists l, val (val A j) l ⊆ val (val A i) k) ->
     exists l, forall i, (i <= j)%nat ->
@@ -426,7 +397,7 @@ Section supremumFacts.
   (* Given the fact proven in lem9, we prove that the given interval I
      is a subset of the kth interval of the supremum, since I is just
      the intersection of the kth intervals of the first j elements. *)
-  Lemma lem10 (A : chain) I j k :
+  Lemma lem10 (A : omegaChain) I j k :
     (forall i, (i <= j)%nat ->
           I ⊆ val (val A i) k) ->
     I ⊆ RsupAux A k (S j).
@@ -448,9 +419,9 @@ Section supremumFacts.
           apply subsetI_intersectionI_2 in IHj; auto.
   Qed.
 
-  (* [Rsupremum A] is "less than" any upper bound of A. *)
-  Lemma Rsupremum_le_upper_bounds (A : chain) :
-    forall b, upper_bound b A -> ⊔ A ⊑ b.
+  (** [Rsupremum A] is "less than" any upper bound of A. *)
+  Lemma Rsupremum_le_upper_bounds (A : omegaChain) :
+    forall b, omega_upper_bound b A -> ⊔ A ⊑ b.
   Proof.
     intros b H0 j.
     assert (exists l, forall i, (i <= j)%nat -> val (val A j) l ⊆ val (val A i) j).
@@ -461,10 +432,10 @@ Section supremumFacts.
     exists k; eapply subsetI_trans; eauto.
   Qed.
 
-  (* [Rsupremum A] is the least upper bound of A. *)
-  Lemma Rsupremum_lub (A : chain) :
-    upper_bound (⊔ A) A /\
-    forall s, upper_bound s A -> ⊔ A ⊑ s.
+  (** [Rsupremum A] is the least upper bound of A. *)
+  Lemma Rsupremum_lub (A : omegaChain) :
+    omega_upper_bound (⊔ A) A /\
+    forall s, omega_upper_bound s A -> ⊔ A ⊑ s.
   Proof.
     split.
     - apply Rsupremum_upper_bound.
@@ -473,24 +444,11 @@ Section supremumFacts.
 End supremumFacts.
 
 
-(* The pseudo-reals form an ω-DCPO. *)
-Section pseudoRealDomain.
-  Open Scope domain_scope.
-  Instance pseudoRealOrder : PosetOrder := Rle.
-
-  Program Instance pseudoRealPoset : Poset pseudoRealOrder.
-  Next Obligation. apply Rle_refl. Qed.
-  Next Obligation. eapply Rle_trans; eauto. Qed.
-
-  Instance pseudoRealBottom : Bottom := Rbot.
-
-  Program Instance pseudoRealPointedPoset
-    : PointedPoset pseudoRealPoset pseudoRealBottom.
-  Next Obligation. unfold bottomAxiom; apply Rbot_bottom. Qed.
-
+(** The pseudo-reals form an ω-DCPO. *)
+Section pseudoRealOmegaDCPO.
   Instance pseudoRealSupremum : OmegaSupremum pseudoRealPoset :=
     Rsupremum.
 
   Program Instance pseudoRealOmegaDCPO : OmegaDCPO pseudoRealSupremum.
   Next Obligation. apply Rsupremum_lub. Qed.
-End pseudoRealDomain.
+End pseudoRealOmegaDCPO.

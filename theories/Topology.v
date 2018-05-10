@@ -21,8 +21,7 @@ Section topology.
     open : set (set X).
 
   (* The collection of open sets satisfies the topology axioms. *)
-  Class Topology (opens : Opens)
-    : Type :=
+  Class Topology (opens : Opens) : Prop :=
     { emptyAxiom : open (@empty X);
       fullAxiom  : open (@full X);
       unionAxiom : forall (C : pow X),
@@ -71,6 +70,39 @@ Section topology.
 End topology.
 
 
+(** Subset type for open sets. *)
+Section openSet.
+  Context {X : Type} {O : Opens X}.
+
+  Definition open_set := {A : set X | open A}.
+
+  Context {T : Topology O}.
+
+  Program Definition empty_open_set : open_set := @exist _ _ (@empty X) _.
+  Next Obligation. firstorder. Qed.
+
+  Program Definition full_open_set : open_set := @exist _ _ (@full X) _.
+  Next Obligation. firstorder. Qed.
+
+  Program Definition countable_union_open_set
+          (C : sequence open_set) : open_set :=
+    @exist _ _ (countable_union (fun i => proj1_sig (C i))) _.
+  Next Obligation. Admitted.
+
+  Program Definition union_open_set (C : set open_set) : open_set :=
+    @exist _ _ (⋃ image (@proj1_sig _ _) C) _.
+  Next Obligation. admit. Admitted.
+
+  Program Definition intersection_open_set (A B : open_set) : open_set :=
+    @exist _ _ (proj1_sig A ∩ proj1_sig B) _.
+  Next Obligation. admit. Admitted.
+  
+  Definition countable_disjoint_open_set
+             (C : sequence open_set) : Prop :=
+    countable_disjoint (fun i => proj1_sig (C i)).
+End openSet.
+
+
 Section basis.
   Variable X : Type.
 
@@ -84,8 +116,7 @@ Section basis.
       C b1 -> C b2 -> (b1 ∩ b2) x ->
       exists b3, C b3 /\ b3 x /\ subset b3 (b1 ∩ b2).
 
-  Class Basis (BSet : BasisSet)
-    : Type :=
+  Class Basis (BSet : BasisSet) : Prop :=
     { basisAx1 : basisAxiom1 BSet;
       basisAx2 : basisAxiom2 BSet }.
 
@@ -362,8 +393,7 @@ Section subbasis.
 
   Definition subbasisAxiom (C : pow X) := ⋃ C = D.
 
-  Class Subbasis (SBSet : SubbasisSet)
-    : Type :=
+  Class Subbasis (SBSet : SubbasisSet) : Prop :=
     { subbasisAx : subbasisAxiom SBSet }.
 
   (* A subbasis gives rise to a basis by letting the basis elements be

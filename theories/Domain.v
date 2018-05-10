@@ -2,7 +2,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Require Import Omega.
 
-Require Import GrappaCoq.Set.
+Require Import GrappaCoq.Set GrappaCoq.Topology.
 Open Scope set_scope.
 
 (** Domain theory *)
@@ -26,7 +26,7 @@ Section poset.
 
   Notation "a '~~' b" := (equiv a b) (at level 65) : domain_scope.
 
-  Class Poset (order : PosetOrder) : Type :=
+  Class Poset (order : PosetOrder) : Prop :=
     { reflAxiom : forall x, x ⊑ x;
       transAxiom : forall x y z, x ⊑ y -> y ⊑ z -> x ⊑ z }.
 
@@ -38,12 +38,8 @@ Section poset.
   Definition bottomAxiom {P : PosetOrder} {B : Bottom} := 
     forall x, ⊥ ⊑ x.
 
-  Class PointedPoset `(P : Poset) (bot : Bottom) : Type :=
-    { botAxiom : bottomAxiom }.
-
-  (* Coercions *)
-  Definition Poset_of_PointedPoset `(P : PointedPoset) : Poset _ := _.
-  Coercion Poset_of_PointedPoset : PointedPoset >-> Poset.
+  Class PointedPoset `(P : Poset) (bot : Bottom) : Prop :=
+    botAxiom : bottomAxiom.
 End poset.
 
 Notation "a '⊑' b" := (le a b) (at level 65) : domain_scope.
@@ -207,6 +203,16 @@ Section posetLemmas.
     exists c; split; auto; split; auto.
     exists y; split; auto.
   Qed.
+
+  Lemma nonempty_upper_supremum_in_set (A : set X) :
+    nonempty A ->
+    is_upper_set A ->
+    forall a, is_supremum a A -> a ∈ A.
+  Proof.
+    intros Hne Hupper a [H0 H1].
+    destruct Hne as [x Hne].
+    apply Hupper with x; firstorder.
+  Qed.
 End posetLemmas.
 
 
@@ -226,14 +232,15 @@ Section directed.
 
   Definition directed (A : set X) :=
     nonempty A /\
-    forall x y, x ∈ A -> y ∈ A -> exists a, upper_bound a (doubleton x y).
-
+    forall x y, x ∈ A -> y ∈ A -> exists a, a ∈ A /\ upper_bound a (doubleton x y).
   Definition directed_set := { A : set X | directed A }.
 End directed.
+
 
 Section monotone.
   Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}.
   Variable f : X -> Y.
+
   Definition monotone := forall x y, x ⊑ y -> f x ⊑ f y.
   Definition image (A : set X) :=
     fun y => exists x, x ∈ A /\ f x ~~ y.
@@ -249,6 +256,32 @@ Section continuous.
 End continuous.
 
 
+Section monotoneLemmas.
+  Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}.
+  Variable f : X -> Y.
+  Lemma monotone_upper_preimage (V : set Y) :
+    monotone f -> is_upper_set V -> is_upper_set (preimage f V).
+  Proof. firstorder. Qed.
+
+  Lemma monotone_directed_image (A : set X) :
+    monotone f -> directed A -> directed (image f A).
+  Proof.
+    intros Hmono [H0 H1].
+    unfold directed in *. split.
+    - destruct H0 as [x Hx]; exists (f x); firstorder.
+    - intros x y (x0 & Hx0 & Hx1) (y0 & Hy0 & Hy1).
+      specialize (H1 x0 y0 Hx0 Hy0).
+      destruct H1 as (a & H1 & H2).
+      exists (f a). split.
+      + firstorder.
+      + destruct Q as [_ transAx].
+        intros b [? | ?]; subst.
+        destruct Hx1 as [_ ?]; eapply transAx; eauto; firstorder.
+        destruct Hy1 as [_ ?]; eapply transAx; eauto; firstorder.
+  Qed.
+End monotoneLemmas.
+
+
 Section continuousLemmas.
   Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}.
   Variable f : X -> Y.
@@ -260,22 +293,53 @@ Section continuousLemmas.
     specialize (H0 (doubleton x y) y).
     assert (H2: forall y0 : X, doubleton x y y0 -> y0 ⊑ y).
     { intros z Hz; destruct Hz; subst; firstorder. }
-    assert (H3: forall y0 : X, (forall y1 : X, doubleton x y y1 -> y1 ⊑ y0) -> y ⊑ y0).
-    { firstorder. }
+    assert (H3: forall y0 : X, (forall y1 : X, doubleton x y y1 -> y1 ⊑ y0) ->
+                          y ⊑ y0) by firstorder.
     assert (H4: directed (doubleton x y)).
-    { unfold directed. split.
+    { split.
       - exists x. firstorder.
-      - intros x' y' Hx' Hy'.
-        destruct Hx'; destruct Hy'; subst.
-        + exists x; intros y' [? | ?]; subst; firstorder.
-        + exists y; intros y' [? | ?]; subst; firstorder.
-        + exists y; intros y' [? | ?]; subst; firstorder.
-        + exists y; intros y' [? | ?]; subst; firstorder. }
+      - intros ? ? [? | ?] [? | ?]; subst;
+          exists y; split; try right; firstorder. }
     specialize (H0 H4 (conj H2 H3)); destruct H0 as [H0 _].
     apply H0; exists x; firstorder.
   Qed.
 End continuousLemmas.
 
+
+Section wayBelow.
+  Context {X : Type} `{P : Poset X}.
+
+  Definition way_below x y :=
+    forall D, directed D ->
+         forall z, is_supremum z D ->
+              y ⊑ z ->
+              exists d, d ∈ D /\ x ⊑ d.
+
+  Notation "a '<<' b" := (way_below a b) (at level 65) : domain_scope.
+
+  Definition compact x := x << x.
+
+  Lemma way_below_le x y :
+    x << y -> x ⊑ y.
+  Proof.
+    intros H0; assert (H1: directed (singleton y)).
+    { split.
+      - exists y; firstorder.
+      - intros x0 y0 H1 H2;
+          unfold in_set, singleton in *; subst.
+        exists y0; split. firstorder.
+        intros y [H1 | H1]; subst; firstorder. }
+    assert (H2: is_supremum y (singleton y)).
+    { split.
+      - unfold ub, singleton, upper_bound, in_set.
+        intros y0 H2; subst; firstorder.
+      - firstorder. }
+    assert (H3: y ⊑ y) by firstorder.
+    specialize (H0 _ H1 y H2 H3); firstorder.
+  Qed.
+End wayBelow.
+
+Notation "a '<<' b" := (way_below a b) (at level 65) : domain_scope.
 
 (** ω-chains are subsets of a poset that are isomorphic to the natural
     numbers with their natural order. *)
@@ -332,43 +396,17 @@ End omegaChain.
 Notation "ω-chain" := omegaChain.
 
 
-(* Section omegaMap. *)
-(*   Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}. *)
-(*   Variable f : X -> Y. *)
-(*   Context {pf : monotone f}. *)
-
-(*   Program Definition omegaMap (A : @omegaChain X order) *)
-(*     : (@omegaChain Y order0) := *)
-(*     fun n => f (val A n). *)
-(*   Next Obligation. intros j; apply pf; destruct A; firstorder. Qed. *)
-(* End omegaMap. *)
-
-
 (** ω-DCPOs: every ω-chain has a supremum. *)
 Section omegaDCPO.
   Class OmegaSupremum `(P : Poset) : Type :=
     omegaSupremum : omegaChain -> X.
 
-  Class OmegaDCPO `(P : Poset) (S : OmegaSupremum P) : Type :=
-    { omegaSupremumAx :
-        forall A : omegaChain, omega_is_supremum (omegaSupremum A) A }.
+  Class OmegaDCPO `(P : Poset) (S : OmegaSupremum P) : Prop :=
+    omegaSupremumAx :
+      forall A : omegaChain, omega_is_supremum (omegaSupremum A) A.
 
-  Class PointedOmegaDCPO `(D : OmegaDCPO) (bot : Bottom) : Type :=
-    { omegaBotAx : bottomAxiom }.
-
-  (* Coercions *)
-  Definition OmegaDCPO_of_PointedOmegaDCPO `(D : PointedOmegaDCPO)
-    : OmegaDCPO _ := _.
-  Coercion OmegaDCPO_of_PointedOmegaDCPO : PointedOmegaDCPO >-> OmegaDCPO.
-
-  Definition PointedPoset_of_PointedOmegaDCPO `(D : PointedOmegaDCPO)
-    : PointedPoset _ _ :=
-    {| botAxiom := match D with Build_PointedOmegaDCPO _ pf => pf end |}.
-  Coercion PointedPoset_of_PointedOmegaDCPO :
-    PointedOmegaDCPO >-> PointedPoset.
-
-  Definition Poset_of_OmegaDCPO `(D : OmegaDCPO) : Poset _ := _.
-  Coercion Poset_of_OmegaDCPO : OmegaDCPO >-> Poset.
+  Class PointedOmegaDCPO `(D : OmegaDCPO) (bot : Bottom) : Prop :=
+    omegaBotAx : bottomAxiom.
 End omegaDCPO.
 
 
@@ -380,44 +418,23 @@ Section lattice.
   Class Infimum `(P : Poset) : Type :=
     infimum : set X -> X.
 
+  (* TODO: is it possible to define the infimum in terms of the
+     supremum? *)
   Class CompleteLattice `(P : Poset) (S : Supremum P) (I : Infimum P)
-    : Type :=
+    : Prop :=
     { completeJoinAx : forall A, is_supremum (supremum A) A;
       completeMeetAx : forall A, is_infimum (infimum A) A }.
 
   Class PointedCompleteLattice `(L : CompleteLattice) (bot : Bottom)
-    : Type :=
-    { completeBotAxiom : bottomAxiom }.
-
-  (* Coercions *)
-  Definition CompleteLattice_of_PointedCompleteLattice
-             `(L : PointedCompleteLattice)
-    : CompleteLattice _ _ := _.
-  Coercion CompleteLattice_of_PointedCompleteLattice
-    : PointedCompleteLattice >-> CompleteLattice.
-
-  Program Definition OmegaDCPO_of_CompleteLattice
-             `(L : CompleteLattice)
-    : OmegaDCPO _ :=
-    @Build_OmegaDCPO _ _ _ (omegaChain_function S0) _.
-  Next Obligation.
-    destruct L as [supAx].
-    specialize (supAx (set_of_omegaChain A)); destruct supAx as [H0 H1].
-    split.
-    - intros j.
-      assert (val A j ∈ set_of_omegaChain A).
-      { exists j; auto; firstorder. }
-      firstorder.
-    - intros b Hb; apply H1; intros y [n ?]; subst; auto.
-  Qed.
-  Coercion OmegaDCPO_of_CompleteLattice : CompleteLattice >-> OmegaDCPO.
+    : Prop :=
+    completeBotAxiom : bottomAxiom.
 End lattice.
 
 Notation "'⊔' x" := (supremum x) (at level 65).
 Notation "'⊓' x" := (infimum x) (at level 65).
 
 
-(** ω-DCPO structure for Scott-continuous function spaces. *)
+(** ω-DCPO structure for Scott continuous function spaces. *)
 Section functionSpace.
   Context {X Y : Type} `{P : OmegaDCPO X} `{Q : OmegaDCPO Y}.
 
@@ -460,8 +477,7 @@ Section functionSpace.
           specialize (pf _ _ Hd Hx); split; firstorder. }
         destruct H1 as [H1 H2].
         assert ((val ((val A) i)) x ⊑ omegaSupremum (apply_chain A x)).
-        { destruct Q as [supAx].
-          specialize (supAx (apply_chain A x)); firstorder. }
+        { specialize (Q (apply_chain A x)); firstorder. }
         destruct P1 as [? transAx]; eapply transAx.
         - apply H1; firstorder.
         - assumption. }
@@ -470,19 +486,16 @@ Section functionSpace.
     - intros y Hy.
       assert (H0: upper_bound y (fun x => exists j y, y ∈ B /\
                                               x ~~ val (val A j) y)).
-      { intros z Hz.
-        destruct Hz as (j & w & Hz & ?); subst.
+      { intros z (j & w & Hz & ?); subst.
         assert (val (val A j) w ⊑ omegaSupremum (apply_chain A w)).
-        { destruct Q as [supAx].
-          specialize (supAx (apply_chain A w)).
-          destruct supAx; destruct H; firstorder. }
+        { specialize (Q (apply_chain A w)).
+          destruct Q; destruct H; firstorder. }
         destruct P1 as [? transAx].
         assert ((val ((val A) j)) w ⊑ y).
         { eapply transAx. apply H0. apply Hy; firstorder. }
         eapply transAx. apply H. assumption. }
-      destruct Q as [supAx].
-      specialize (supAx (apply_chain A x)).
-      destruct supAx as [_ supAx].
+      specialize (Q (apply_chain A x)).
+      destruct Q as [_ supAx].
       apply supAx; clear supAx; intros j.
       assert (H1: is_supremum ((val (apply_chain A x)) j)
                               (image (val (val A j)) B)).
@@ -507,11 +520,11 @@ Section functionSpace.
     omega_is_supremum (⊔ A) A.
   Proof.
     split.
-    - intros n x; destruct Q as [supAx].
-      specialize (supAx (apply_chain A x)); firstorder.
-    - intros f Hf x; destruct Q as [supAx].
-      specialize (supAx (apply_chain A x)).
-      destruct supAx; apply H0; firstorder.
+    - intros n x; pose proof Q as supAx;
+        specialize (supAx (apply_chain A x)); firstorder.
+    - intros f Hf x; pose proof Q as supAx;
+        specialize (supAx (apply_chain A x));
+        destruct supAx; apply H0; firstorder.
   Qed.
 
   Instance functionOmegaSupremum : OmegaSupremum functionPoset :=
@@ -520,3 +533,135 @@ Section functionSpace.
   Program Instance functionOmegaDCPO : OmegaDCPO functionOmegaSupremum.
   Next Obligation. apply functionSupremum_is_supremum. Qed.
 End functionSpace.
+
+
+Section scottTopology.
+  Context {X : Type} `{P : Poset X}.
+
+  Definition inaccessible_by_directed_joins (A : set X) :=
+    forall D, directed D ->
+         (exists x, is_supremum x D /\ x ∈ A) ->
+         nonempty (D ∩ A).
+
+  Definition closed_under_directed_joins (A : set X) :=
+    forall B, B ⊆ A /\ directed B ->
+         forall b, is_supremum b B ->
+              b ∈ A.
+
+  Definition scott_open (A : set X) :=
+    is_upper_set A /\ inaccessible_by_directed_joins A.
+
+  Definition scott_closed (A : set X) :=
+    is_lower_set A /\ closed_under_directed_joins A.
+
+  Instance scottOpens : Opens X :=
+    fun A => scott_open A.
+
+  Lemma empty_scott_open :
+    open (@empty X).
+  Proof. firstorder. Qed.
+
+  Lemma full_scott_open :
+    open (@full X).
+  Proof. firstorder. Qed.
+
+  Lemma union_scott_open (C : pow X) :
+    (forall A : set X, C A -> open A) ->
+    open (⋃ C).
+  Proof.
+    intros H0; split.
+    - intros x y H1 (A & H2 & H3); exists A; firstorder.
+    - intros D HD (x & H1 & (A & H2 & H3)).
+      specialize (H0 A H2); destruct H0.
+      assert (H4: exists x : X, is_supremum x D /\ x ∈ A) by firstorder.
+      specialize (H0 D HD H4); destruct H0; exists x0.
+      split; try exists A; firstorder.
+  Qed.
+
+  Lemma intersection_scott_open (A B : set X) :
+    open A -> open B -> open (A ∩ B).
+  Proof.
+    intros [H0 H1] [H2 H3].
+    split.
+    - firstorder.
+    - intros D HD (x & H4 & H5).
+      assert (H6: exists x : X, is_supremum x D /\ x ∈ A) by firstorder.
+      assert (H7: exists x : X, is_supremum x D /\ x ∈ B) by firstorder.
+      specialize (H1 D HD H6); specialize (H3 D HD H7).
+      clear H6 H7.
+      destruct H1 as (y & H1 & H1'); destruct H3 as (z & H3 & H3').
+      destruct HD as [HD HD']; specialize (HD' y z H1 H3).
+      destruct HD' as (a & HD' & HD''); exists a.
+      split; auto. split.
+      + apply H0 with y; firstorder.
+      + apply H2 with z; firstorder.
+  Qed.
+
+  Instance scottTopology : Topology scottOpens.
+  Proof.
+    constructor.
+    - apply empty_scott_open.
+    - apply full_scott_open.
+    - apply union_scott_open.
+    - apply intersection_scott_open.
+  Qed.
+End scottTopology.
+
+
+Section scottTopologyLemmas.
+  Context {X Y : Type} `{P : Poset X} `{Q : Poset Y}.
+  Variable f : X -> Y.
+
+  Existing Instance scottOpens.
+
+  (* Seems unprovable without LEM. *)
+  (* Lemma jdfg (A : set X) : *)
+  (*   scott_closed A <-> closed A. *)
+  (* Proof. *)
+  (*   split; intros H0. *)
+  (*   - unfold scott_closed in H0. unfold closed. unfold open, scottOpens, scott_open. *)
+  (*     destruct H0 as [H0 H1]. *)
+  (*     split. *)
+  (*     + firstorder. *)
+  (*     + unfold inaccessible_by_directed_joins. *)
+  (*       unfold closed_under_directed_joins in H1. *)
+  (*       intros D HD (x & H2 & H3). unfold nonempty. *)
+  (*       assert (H4: D ⊆ A \/ ~ D ⊆ A). *)
+  (*       { admit. } *)
+  (*       (* destruct H4 as [H4 | H4]. *) *)
+  (*       (* * specialize (H1 D (conj H4 HD) x H2). firstorder. *) *)
+  (*       (* * exists d *) *)
+  (*       (* unfold intersection. *) *)
+  (*       (* exists x. split; auto. *) *)
+
+  (* Lemma continuous_monotone : *)
+  (*   continuous f -> monotone f. *)
+  (* Proof. *)
+  (*   intros Hcont. unfold continuous in Hcont. *)
+  (*   intros x y H0. *)
+  (*   unfold scottOpens, scott_open in Hcont. *)
+  (*   (* Not sure if this can be proven constructively.. *) *)
+  (* Admitted. *)
+
+  (* Is the converse provable? *)
+  Lemma scott_continuous_continuous :
+    scott_continuous f -> continuous f.
+  Proof.
+    intros H0.
+    generalize (scott_continuous_monotone H0). intros Hmono.
+    intros V [H1 H2].
+    split.
+    - apply monotone_upper_preimage; auto.
+    - intros D HD (x & H3 & H4).
+      assert (H5 : directed (image f D)).
+      { apply monotone_directed_image; auto. }
+      assert (H6: exists x : Y, is_supremum x (image f D) /\ x ∈ V).
+      { exists (f x); split.
+        - apply H0; auto.
+        - firstorder. }
+      specialize (H2 (image f D) H5 H6).
+      destruct H2 as (y & (x0 & H2 & H2') & H2'').
+      exists x0; split; auto.
+      specialize (H1 y (f x0)); firstorder.
+  Qed.
+End scottTopologyLemmas.
