@@ -13,26 +13,26 @@ Section extendedReal.
   Existing Instance rationalOrder.
   Existing Instance rationalPoset.
 
-  Definition eRAx (A : set Q) :=
+  Definition RplusAx (A : set Q) :=
     (forall x, x ∈ A -> 0 < x) /\ is_upper_set A /\ no_least A.
-  Definition eR := { A : set Q | eRAx A }.
+  Definition Rplus := { A : set Q | RplusAx A }.
 
-  Definition Rle (r1 r2 : eR) :=
+  Definition Rle (r1 r2 : Rplus) :=
     val r2 ⊆ val r1.
 
   Open Scope domain_scope.
-  Instance eROrder : PosetOrder := Rle.
+  Instance RplusOrder : PosetOrder := Rle.
 
-  Program Instance eRPoset : Poset eROrder.
+  Program Instance RplusPoset : Poset RplusOrder.
   Next Obligation. firstorder. Qed.
   Next Obligation. eapply subset_trans; eauto. Qed.
 
   Definition positive_rationals : set Q := fun x => 0 < x.
 
-  Program Definition eRtop : eR := (@empty Q).
+  Program Definition Rplustop : Rplus := (@empty Q).
   Next Obligation. firstorder. Qed.
 
-  Program Definition eRbot : eR := positive_rationals.
+  Program Definition Rplusbot : Rplus := positive_rationals.
   Next Obligation.
     split.
     - firstorder.
@@ -48,26 +48,26 @@ Section extendedReal.
           -- apply Qdiv_2_le; auto.
   Qed.
 
-  Definition eRzero := eRbot.
+  Definition Rpluszero := Rplusbot.
 
-  Notation "+∞" := eRtop : real_scope.
+  Notation "+∞" := Rplustop : real_scope.
   Open Scope real_scope.
 
-  Lemma eRtop_top :
+  Lemma Rplustop_top :
     forall r, r ⊑ +∞.
   Proof. firstorder. Qed.
 
-  Lemma eRbot_bot :
-    forall r, eRbot ⊑ r.
+  Lemma Rplusbot_bot :
+    forall r, Rplusbot ⊑ r.
   Proof.
-    unfold le, eROrder, Rle, eRbot.
+    unfold le, RplusOrder, Rle, Rplusbot.
     intros r; destruct r; simpl; firstorder.
   Qed.
 
   (** The supremum is the intersection of the sets of rationals. We
       must also intersect with positive_rationals in case A is empty,
       and then ensure that there is no least element. *)
-  Program Definition eRSupremum (A : set eR) : eR :=
+  Program Definition RplusSupremum (A : set Rplus) : Rplus :=
     without_least (⋂ image (@proj1_sig _ _) A ∩ positive_rationals).
   Next Obligation.
     split.
@@ -79,7 +79,7 @@ Section extendedReal.
         * split.
           -- intros B ([w (H4 & H5 & H6)] & HB & ?); simpl in *; subst.
              eapply H5; eauto; apply H1.
-             exists (exist (fun A : set Q => eRAx A) _ (conj H4 (conj H5 H6))).
+             exists (exist (fun A : set Q => RplusAx A) _ (conj H4 (conj H5 H6))).
              subst; split; auto.
           -- unfold le, rationalOrder in H0.
              unfold positive_rationals in *.
@@ -91,10 +91,10 @@ Section extendedReal.
         exists ((a + b) / (2#1)); split.
         * assert (H3: forall c, a ⊑ c ->
                            c ∈ ⋂ image
-                             (proj1_sig (P:=fun A : set Q => eRAx A)) A).
+                             (proj1_sig (P:=fun A : set Q => RplusAx A)) A).
           { intros c Hc B (z & H3 & ?); subst.
             destruct H0 as [H0 H0']; specialize (H0 (val z)).
-            assert (exists x : {A : set Q | eRAx A}, x ∈ A /\ val x = val z).
+            assert (exists x : {A : set Q | RplusAx A}, x ∈ A /\ val x = val z).
             { exists z; auto. }
             apply H0 in H.
             destruct z as [z (H4 & H5 & H6)]; simpl in *.
@@ -130,7 +130,7 @@ Section extendedReal.
              ++ apply Qle_shift_div_r; lra.
   Qed.
 
-  Program Definition eRInfimum (A : set eR) : eR :=
+  Program Definition RplusInfimum (A : set Rplus) : Rplus :=
     ⋃ (image (@proj1_sig _ _) A).
   Next Obligation.
     split.
@@ -146,10 +146,10 @@ Section extendedReal.
         exists C; split; auto; eexists; eauto.
   Qed.
 
-  Notation "'⊔' x" := (eRSupremum x) (at level 65) : real_scope.
-  Notation "'⊓' x" := (eRInfimum x) (at level 65) : real_scope.
+  Notation "'⊔' x" := (RplusSupremum x) (at level 65) : real_scope.
+  Notation "'⊓' x" := (RplusInfimum x) (at level 65) : real_scope.
 
-  Lemma eRSupremum_is_supremum (A : set eR) :
+  Lemma RplusSupremum_is_supremum (A : set Rplus) :
     is_supremum (⊔ A) A.
   Proof.
     unfold is_supremum. split.
@@ -158,166 +158,166 @@ Section extendedReal.
       + eapply big_intersection_largest_subset; eauto.
         intros B (z & HB & ?); subst.
         specialize (Hs z HB); firstorder.
-      + destruct s; destruct e; apply q; assumption.
-      + destruct s; destruct e as (H0 & H1 & H2).
-        apply H2 in Hx; destruct Hx as (y & H3 & H4).
+      + destruct s as (? & Hpos & ?); apply Hpos; auto.
+      + destruct s as (? & Hpos & (? & Hax)).
+        apply Hax in Hx; destruct Hx as (y & ? & ?).
         exists y; split; auto; split.
         * eapply big_intersection_largest_subset; eauto.
-          intros B (z & HB & ?); subst.
+          intros ? (? & ? & ?); subst.
           apply Hs; assumption.
-        * apply H0; assumption.
+        * apply Hpos; assumption.
   Qed.
 
-  Lemma eRInfimum_is_infimum (A : set eR) :
+  Lemma RplusInfimum_is_infimum (A : set Rplus) :
     is_infimum (⊓ A) A.
   Proof.
     split.
-    - intros y Hy x Hx; exists (val y); split; auto; exists y; split; auto.
-    - intros y Hy x (B & (z & H0 & ?) & H1); subst.
+    - intros y ? ? ?; exists (val y); split; auto; exists y; split; auto.
+    - intros y Hy x (? & (z & ? & ?) & ?); subst.
       assert (y ⊑ z) by (apply Hy; auto).
       destruct y; destruct z; simpl in *; firstorder.
   Qed.
 End extendedReal.
 
+Notation "+∞" := Rplustop : real_scope.
+Notation "'⊔' x" := (RplusSupremum x) (at level 65) : real_scope.
+Notation "'⊓' x" := (RplusInfimum x) (at level 65) : real_scope.
+Open Scope real_scope.
+
 
 (** The non-negative reals extended with +∞ form a complete lattice. *)
 Section extendedRealDomain.
-  Program Instance eRCompleteLattice :
-    @CompleteLattice _ _ eRPoset eRSupremum eRInfimum.
-  Next Obligation. apply eRSupremum_is_supremum. Qed.
-  Next Obligation. apply eRInfimum_is_infimum. Qed.
+  Program Instance RplusCompleteLattice :
+    @CompleteLattice _ _ RplusPoset RplusSupremum RplusInfimum.
+  Next Obligation. apply RplusSupremum_is_supremum. Qed.
+  Next Obligation. apply RplusInfimum_is_infimum. Qed.
 
-  Instance eRBottom : Bottom := eRbot.
+  Instance RplusBottom : Bottom := Rplusbot.
 
-  Program Instance eRPointedCompleteLattice
-    : PointedCompleteLattice eRCompleteLattice eRBottom.
-  Next Obligation. unfold bottomAxiom; apply eRbot_bot. Qed.
+  Program Instance RplusPointedCompleteLattice
+    : PointedCompleteLattice RplusCompleteLattice RplusBottom.
+  Next Obligation. unfold bottomAxiom; apply Rplusbot_bot. Qed.
 End extendedRealDomain.
 
 
 Require Import ProofIrrelevance.
 Lemma subset_PI {X : Type} {P : X -> Prop} (x y : X) (pf1 : P x) (pf2 : P y) :
-  x = y ->
-  exist _ x pf1 = exist _ y pf2.
+  x = y -> exist _ x pf1 = exist _ y pf2.
 Proof. intros ->; f_equal; apply proof_irrelevance. Qed.
 
 
 Section sum.
   (* Binary sum of nonnegative reals. *)
-  Program Definition eRplus (r1 r2 : eR) : eR :=
+  Program Definition Rplusplus (r1 r2 : Rplus) : Rplus :=
     fun x => exists a b, a ∈ val r1 /\ b ∈ val r2 /\ x == a + b.
   Next Obligation.
     destruct r1 as (r1 & r1Ax0 & r1Ax1 & r1Ax2);
       destruct r2 as (r2 & r2Ax0 & r2Ax1 & r2Ax2); simpl.
     split.
-    - intros x (a & b & H0 & H1 & H2); subst.
-      specialize (r1Ax0 a H0); specialize (r2Ax0 b H1); lra.
+    - intros ? (? & ? & Ha & Hb & ?); subst.
+      specialize (r1Ax0 _ Ha); specialize (r2Ax0 _ Hb); lra.
     - split.
-      + unfold is_upper_set in *.
-        intros x y H0 (a & b & H1 & H2 & H3).
-        unfold in_set.
-        assert (H4: a <= y).
+      + intros x y H0 (a & b & Ha & Hb & ?).
+        assert (a <= y).
         { unfold le, rationalOrder in H0;
-            specialize (r2Ax0 b H2); lra. }
+            specialize (r2Ax0 b Hb); lra. }
         set (c := y - a - b).
-        assert (H5: b + c <= y).
+        assert (b + c <= y).
         { unfold le, rationalOrder in H0;
-            specialize (r1Ax0 a H1); unfold c; lra. }
-        assert (H6: b + c ∈ r2).
-        { apply r2Ax1 with b; auto. unfold le, rationalOrder in *.
-          unfold c in *. lra. }
-        exists a, (b + c). split; auto. split; auto.
-        unfold c; lra.
-      + intros x (a & b & H1 & H2 & H3); subst.
-        specialize (r1Ax2 a H1); destruct r1Ax2  as (y & Hy0 & Hy1).
-        specialize (r2Ax2 b H2); destruct r2Ax2  as (z & Hz0 & Hz1).
+            specialize (r1Ax0 a Ha); unfold c; lra. }
+        assert (b + c ∈ r2).
+        { apply r2Ax1 with b; auto.
+          unfold le, rationalOrder, c in *; lra. }
+        exists a, (b + c); split; auto; split; auto; unfold c; lra.
+      + intros x (? & ? & Hx & Hy & ?); subst.
+        specialize (r1Ax2 _ Hx); destruct r1Ax2 as (y & ? & ?).
+        specialize (r2Ax2 _ Hy); destruct r2Ax2 as (z & ? & ?).
         exists (y + z); split.
         * exists y, z; firstorder.
-        * unfold lt, equiv, le, rationalOrder in *. split; lra.
+        * unfold lt, equiv, le, rationalOrder in *; split; lra.
   Qed.
 
-  Lemma eRplus_0_l r:
-    eRplus eRzero r = r.
+  Lemma Rplusplus_0_l r :
+    Rplusplus Rpluszero r = r.
   Proof.
     destruct r as [r Hr]; apply subset_PI; simpl.
     apply extensionality; split.
-    - intros x (a & b & H0 & H1 & H2).
+    - intros x (? & b & ? & ? & ?).
       unfold in_set, positive_rationals in *.
-      assert (H3: b <= x) by lra.
+      assert (b <= x) by lra.
       destruct Hr as (_ & Hr & _); eapply Hr; eauto.
-    - intros x Hx; destruct Hr as (H0 & H1 & H2).
-      specialize (H2 x Hx); destruct H2 as (y & H2 & H3).
+    - intros x Hx; destruct Hr as (? & ? & Hr).
+      specialize (Hr x Hx); destruct Hr as (y & ? & Hr).
       exists (x - y), y; split.
-      + destruct H3 as [H3 H4].
-        unfold in_set, positive_rationals, equiv, le, rationalOrder in *.
-        lra.
+      + destruct Hr as [? ?].
+        unfold in_set, positive_rationals,
+        equiv, le, rationalOrder in *; lra.
       + split; auto; lra.
   Qed.
 
-  Lemma eRplus_0_r r:
-    eRplus r eRzero = r.
+  Lemma Rplusplus_0_r r :
+    Rplusplus r Rpluszero = r.
   Proof.
     destruct r as [r Hr]; apply subset_PI; simpl.
     apply extensionality; split.
-    - intros x (a & b & H0 & H1 & H2).
+    - intros x (a & ? & ? & ? & ?).
       unfold in_set, positive_rationals in *.
-      assert (H3: a <= x) by lra.
+      assert (a <= x) by lra.
       destruct Hr as (_ & Hr & _); eapply Hr; eauto.
-    - intros x Hx; destruct Hr as (H0 & H1 & H2).
-      specialize (H2 x Hx); destruct H2 as (y & H2 & H3).
+    - intros x Hx; destruct Hr as (? & ? & Hr).
+      specialize (Hr x Hx); destruct Hr as (y & ? & ?).
       exists y, (x - y); split; auto. split; try lra.
       unfold in_set, lt, equiv, le, rationalOrder,
       positive_rationals in *; lra.
   Qed.
 
-  Lemma eRplus_comm a b :
-    eRplus a b = eRplus b a.
+  Lemma Rplusplus_comm a b :
+    Rplusplus a b = Rplusplus b a.
   Proof.
     apply subset_PI; apply extensionality; split;
       intros x (p & q & ?); exists q, p; rewrite Qplus_comm; intuition.
   Qed.
 
-  Lemma eRplus_assoc a b c :
-    eRplus a (eRplus b c) = eRplus (eRplus a b) c.
+  Lemma Rplusplus_assoc a b c :
+    Rplusplus a (Rplusplus b c) = Rplusplus (Rplusplus a b) c.
   Proof.
     apply subset_PI; apply extensionality; split.
-    - intros x (y & z & H0 & (p & q & H3 & H4 & H5) & H2).
+    - intros ? (y & ? & ? & (p & q & ? & ? & ?) & ?).
       exists (y + p), q; split.
       + exists y, p; split; auto; split; auto; lra.
       + split; auto; lra.
-    - intros x (y & z & (p & q & H3 & H4 & H5) & H1 & H2).
+    - intros ? (? & z & (p & q & ? & ? & ?) & ? & ?).
       exists p, (q + z); split; auto; split; try lra.
       + exists q, z; split; auto; split; auto; lra.
   Qed.
 
   (* Sum over a finite list of nonnegative reals. *)
-  Definition sum_list := fold_right eRplus eRzero.
+  Definition sum_list := fold_right Rplusplus Rpluszero.
 
-  Lemma sum_list_app (l1 l2 : list eR) :
-    sum_list (l1 ++ l2) = eRplus (sum_list l1) (sum_list l2).
+  Lemma sum_list_app (l1 l2 : list Rplus) :
+    sum_list (l1 ++ l2) = Rplusplus (sum_list l1) (sum_list l2).
   Proof.
-    induction l1; simpl.
-    - rewrite eRplus_0_l; auto.
-    - rewrite IHl1; apply eRplus_assoc.
+    induction l1 as [| ? ? IH]; simpl.
+    - rewrite Rplusplus_0_l; auto.
+    - rewrite IH; apply Rplusplus_assoc.
   Qed.
 
   Lemma sum_list_const_0 i :
-    sum_list (prefix (fun _ => eRzero) i) = eRzero.
+    sum_list (prefix (fun _ => Rpluszero) i) = Rpluszero.
   Proof.
-    induction i; auto.
-    simpl. rewrite sum_list_app. simpl. rewrite IHi.
-    rewrite !eRplus_0_l; auto.
+    induction i as [| ? IH]; auto; simpl.
+    rewrite sum_list_app, IH; simpl; rewrite !Rplusplus_0_l; auto.
   Qed.
 
   (* Sum over a countable set of nonnegative reals by taking the
      supremum of an ascending chain of prefix sums. *)
-  Program Definition eR_sequence_sum (A : sequence eR) : eR :=
-    eRSupremum (set_of_sequence (fun i => sum_list (prefix A i))).
+  Program Definition Rplus_sequence_sum (A : sequence Rplus) : Rplus :=
+    RplusSupremum (set_of_sequence (fun i => sum_list (prefix A i))).
 End sum.
 
 
 (* Section minus. *)
-(*   Program Definition eRminus (r1 r2 : eR) : eR := *)
+(*   Program Definition Rplusminus (r1 r2 : Rplus) : Rplus := *)
 (*     fun x => exists a b, a ∈ val r1 /\ b ∈ val r2 /\ x == a - b /\ 0 < x. *)
 (*   Next Obligation. *)
 (*     split. firstorder. split. *)
@@ -328,7 +328,7 @@ End sum.
 
 
 Section interval.
-  Program Definition eR_of_Q (q : Q) : eR :=
+  Program Definition Rplus_of_Q (q : Q) : Rplus :=
     fun x => 0 < x /\ q < x.
   Next Obligation.
     split. firstorder. split.
@@ -347,14 +347,14 @@ Section interval.
           -- apply Qdiv_2_le; auto.
   Qed.
 
-  Lemma eR_of_Q_0 :
-    eR_of_Q 0 = eRzero.
+  Lemma Rplus_of_Q_0 :
+    Rplus_of_Q 0 = Rpluszero.
   Proof. apply subset_PI; apply extensionality; firstorder. Qed.
 
   (* Length of an interval (produces a real). *)
   Definition qI_length (q : qI) :=
     match q with
-    | CompleteQI => eRtop
-    | BoundedQI l h => eR_of_Q (h - l)
+    | CompleteQI => +∞
+    | BoundedQI l h => Rplus_of_Q (h - l)
     end.
 End interval.
